@@ -35,16 +35,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           where: {
             status: "PUBLISHED",
             lang,
-            OR: [{ title: { contains: query } }, { content: { contains: query } }],
+            OR: [{ title: { contains: query, mode: "insensitive" } }, { content: { contains: query, mode: "insensitive" } }],
           },
           take: 10,
         }),
         db.course.findMany({
-          where: { active: true, OR: [{ name: { contains: query } }, { description: { contains: query } }] },
+          where: { active: true, OR: [{ name: { contains: query, mode: "insensitive" } }, { description: { contains: query, mode: "insensitive" } }] },
           take: 10,
         }),
         db.eventNews.findMany({
-          where: { published: true, OR: [{ title: { contains: query } }, { body: { contains: query } }] },
+          where: { published: true, OR: [{ title: { contains: query, mode: "insensitive" } }, { body: { contains: query, mode: "insensitive" } }] },
           take: 10,
         }),
       ])

@@ -1,6 +1,5 @@
-import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
 import { randomBytes } from "crypto";
+import { db } from "@/lib/db";
 
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const EXT: Record<string, string> = {
@@ -11,9 +10,9 @@ const EXT: Record<string, string> = {
 };
 
 /**
- * NFR-SEC-04: uploads are stored OUTSIDE the public web root (storage/uploads)
- * and served only through the role-checked /api/files route.
- * Returns the relative storage path, e.g. "applications/ab12cd.jpg".
+ * NFR-SEC-04: uploads are stored in the database (FileBlob) — serverless hosts
+ * like Vercel have no writable filesystem — and served only through the
+ * role-checked /api/files route. Returns the relative path, e.g. "applications/ab12cd.jpg".
  */
 export async function saveUpload(file: File, folder: string, maxBytes = 1024 * 1024): Promise<{ path: string } | { error: string }> {
   if (!ALLOWED.has(file.type)) return { error: "Only JPG, PNG, WEBP, or PDF files are accepted." };
@@ -27,9 +26,7 @@ export async function saveUpload(file: File, folder: string, maxBytes = 1024 * 1
     (file.type === "application/pdf" && buf.subarray(0, 4).toString() === "%PDF");
   if (!magicOk) return { error: "The file content doesn't match its type." };
 
-  const name = `${randomBytes(8).toString("hex")}.${EXT[file.type]}`;
-  const dir = join(process.cwd(), "storage", "uploads", folder);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, name), buf);
-  return { path: `${folder}/${name}` };
+  const path = `${folder}/${randomBytes(8).toString("hex")}.${EXT[file.type]}`;
+  await db.fileBlob.create({ data: { path, mime: file.type, data: buf } });
+  return { path };
 }

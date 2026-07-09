@@ -5,20 +5,35 @@ The complete web platform for **Bangladesh Community School, Korea** — public 
 ## Stack
 
 - **Next.js 15** (App Router, TypeScript, Tailwind CSS 4) — one codebase for all four surfaces
-- **Prisma** ORM — SQLite in development, MySQL-ready for production
+- **Prisma + PostgreSQL** — `npx prisma dev` locally, Vercel Postgres/Neon (or any Postgres) in production; uploads are stored as DB blobs so the app runs on serverless hosts
 - **JWT sessions** (jose) + bcrypt password hashing, role-based access control
 - **Toss Payments** sandbox for card payments; manual Hana Bank transfer with receipt verification
 - **pdfkit** for receipts, enrollment certificates, result sheets, and QR-verified digital ID cards
-- **nodemailer** for email (falls back to a `storage/outbox/` simulation when SMTP is unconfigured)
+- **nodemailer** for email (simulated — logged/saved locally — until SMTP is configured)
 
 ## Getting started
 
 ```bash
 npm install
-npx prisma migrate dev     # creates dev.db
-npm run db:seed            # loads real bcskr.org content + demo accounts
-npm run dev                # http://localhost:3000
+npx prisma dev --name bcsk   # starts a local Postgres; copy the DATABASE_URL it prints
+cp .env.example .env         # paste the DATABASE_URL (and SHADOW_DATABASE_URL) into .env
+npx prisma migrate deploy    # creates the schema
+npm run db:seed              # loads real bcskr.org content + demo accounts
+npm run dev                  # http://localhost:3000
 ```
+
+## Deploying to Vercel
+
+1. Import the GitHub repo into Vercel.
+2. In the Vercel dashboard → **Storage → Create Database → Postgres (Neon)** and connect it to the project — this auto-adds `DATABASE_URL` to the project's environment variables.
+3. Add the remaining environment variables (Project → Settings → Environment Variables): `JWT_SECRET` (strong random string), `NEXT_PUBLIC_BASE_URL` (e.g. `https://bcsk.vercel.app`), `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, and optionally the `SMTP_*`/`RECAPTCHA_*` keys.
+4. From your machine, apply the schema and seed the production database:
+   ```bash
+   DATABASE_URL="<the Neon URL from Vercel>" npx prisma migrate deploy
+   DATABASE_URL="<the Neon URL from Vercel>" npm run db:seed
+   ```
+   (PowerShell: `$env:DATABASE_URL="<url>"; npx prisma migrate deploy` then `npm run db:seed`.)
+5. Redeploy. The build runs `prisma generate` automatically (`postinstall`).
 
 ### Demo accounts (password `bcsk1234` for all)
 
@@ -47,13 +62,13 @@ English (default), বাংলা, and 한국어 — switcher in the top bar. U
 
 ## Going to production — what you need to provide
 
-1. **MySQL 8** — change `provider = "sqlite"` to `"mysql"` in `prisma/schema.prisma`, set `DATABASE_URL`, run `prisma migrate deploy`. The schema uses only MySQL-compatible types.
-2. **Toss Payments live keys** — replace `TOSS_CLIENT_KEY` / `TOSS_SECRET_KEY` in `.env` (currently the public sandbox keys). Any Korean PG with a confirm-API works with small changes in `src/lib/payments.ts`.
-3. **SMTP credentials** — set `SMTP_HOST/PORT/USER/PASS/FROM`; until then emails are written to `storage/outbox/`.
+1. **PostgreSQL** — any hosted Postgres (Vercel Postgres/Neon, Supabase, RDS…). If the school later self-hosts with MySQL 8 per the SRS, switch the provider in `prisma/schema.prisma`; the model types are MySQL-compatible.
+2. **Toss Payments live keys** — replace `TOSS_CLIENT_KEY` / `TOSS_SECRET_KEY` (currently the public sandbox keys). Any Korean PG with a confirm-API works with small changes in `src/lib/payments.ts`.
+3. **SMTP credentials** — set `SMTP_HOST/PORT/USER/PASS/FROM`; until then emails are simulated (logged, or saved to `storage/outbox/` where the disk is writable).
 4. **Zoom** — teachers paste meeting links per session (works today). For API-generated meetings, set the `ZOOM_*` env vars and extend `LiveControls`.
 5. **Google reCAPTCHA** — set `RECAPTCHA_SITE_KEY` / `RECAPTCHA_SECRET_KEY` to enforce bot checks on the application and contact forms (skipped while empty).
 6. **JWT_SECRET** — set a strong random value.
-7. **Uploads & backups** — user uploads live in `storage/uploads/` (served role-checked via `/api/files/...`); include `storage/` and the database in the daily backup (NFR-REL-02).
+7. **Backups** — user uploads live in the database (`FileBlob` table, served role-checked via `/api/files/...`), so backing up the database backs up everything (NFR-REL-02).
 
 ## Notes
 

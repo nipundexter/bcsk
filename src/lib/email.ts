@@ -21,15 +21,21 @@ export async function sendMail(to: string, subject: string, html: string) {
     await transporter.sendMail({ from, to, subject, html });
     return { simulated: false };
   }
-  // simulated outbox
-  const dir = join(process.cwd(), "storage", "outbox");
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, `${Date.now()}-${subject.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}.html`);
-  writeFileSync(
-    file,
-    `<!-- SIMULATED EMAIL (no SMTP configured)\nTo: ${to}\nFrom: ${from}\nSubject: ${subject}\nDate: ${new Date().toISOString()}\n-->\n${html}`
-  );
-  console.log(`[email:simulated] to=${to} subject="${subject}" -> ${file}`);
+  // Simulated outbox. On hosts with a writable disk the message is saved to
+  // storage/outbox; on serverless (read-only FS) it is logged instead — either
+  // way the calling flow never fails because SMTP isn't configured yet.
+  try {
+    const dir = join(process.cwd(), "storage", "outbox");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `${Date.now()}-${subject.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}.html`);
+    writeFileSync(
+      file,
+      `<!-- SIMULATED EMAIL (no SMTP configured)\nTo: ${to}\nFrom: ${from}\nSubject: ${subject}\nDate: ${new Date().toISOString()}\n-->\n${html}`
+    );
+    console.log(`[email:simulated] to=${to} subject="${subject}" -> ${file}`);
+  } catch {
+    console.log(`[email:simulated] to=${to} subject="${subject}" (read-only FS — logged only)`);
+  }
   return { simulated: true };
 }
 

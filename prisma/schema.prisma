@@ -1,15 +1,26 @@
 // BCSK Platform data model (SRS §7)
-// Dev: SQLite. Production: switch provider to "mysql" — types below are MySQL-compatible.
-// Role/status/type fields are strings validated against constants in src/lib/constants.ts
-// (SQLite provider does not support Prisma enums).
+// PostgreSQL — works with Vercel Postgres/Neon (deployment) and `npx prisma dev` (local).
+// The types below are also MySQL-compatible if the school later self-hosts per the SRS.
+// Role/status/type fields are strings validated against constants in src/lib/constants.ts.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  // Used only by `prisma migrate dev` locally; not needed in production.
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// Uploaded files live in the database so the app runs on serverless hosts
+// (no writable filesystem on Vercel). Served role-checked via /api/files/[...path].
+model FileBlob {
+  path      String   @id // e.g. "applications/ab12cd.jpg"
+  mime      String
+  data      Bytes
+  createdAt DateTime @default(now())
 }
 
 model User {

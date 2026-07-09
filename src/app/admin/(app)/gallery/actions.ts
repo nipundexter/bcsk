@@ -1,11 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
-import { randomBytes } from "crypto";
 import { requireAdmin, audit } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { saveUpload } from "@/lib/uploads";
 
 export type GalleryState = { ok?: boolean; error?: string } | null;
 
@@ -21,26 +19,22 @@ export async function createAlbum(_prev: GalleryState, formData: FormData): Prom
   return { ok: true };
 }
 
-/** Gallery photos are public content → stored under public/images/gallery-uploads. */
+/** Gallery photos are public site content, stored as DB blobs (serverless-safe). */
 export async function addGalleryImage(_prev: GalleryState, formData: FormData): Promise<GalleryState> {
   const admin = await requireAdmin();
   const albumId = Number(formData.get("albumId"));
   const caption = String(formData.get("caption") ?? "").trim() || null;
   const file = formData.get("image") as File | null;
   if (!file || file.size === 0) return { error: "Choose an image." };
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return { error: "JPG, PNG, or WEBP only." };
-  if (file.size > 8 * 1024 * 1024) return { error: "Max 8 MB per image." };
+  if (file.type === "application/pdf") return { error: "JPG, PNG, or WEBP only." };
 
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const name = `${randomBytes(8).toString("hex")}.${ext}`;
-  const dir = join(process.cwd(), "public", "images", "gallery-uploads");
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, name), Buffer.from(await file.arrayBuffer()));
+  const saved = await saveUpload(file, "gallery", 8 * 1024 * 1024);
+  if ("error" in saved) return { error: saved.error };
 
   await db.galleryItem.create({
-    data: { albumId, url: `/images/gallery-uploads/${name}`, caption },
+    data: { albumId, url: `/api/files/${saved.path}`, caption },
   });
-  await audit(admin.userId, "GALLERY_UPLOAD", "GalleryItem", name);
+  await audit(admin.userId, "GALLERY_UPLOAD", "GalleryItem", saved.path);
   revalidatePath("/admin/gallery");
   revalidatePath("/events/gallery");
   return { ok: true };
