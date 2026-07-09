@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+:root {
+  /* BCSK palette — derived from the school logo (navy + sky) with warm complements */
+  --navy: #1d2b64;
+  --navy-deep: #141f4b;
+  --sky: #38a8dc;
+  --sky-soft: #d9eef8;
+  --cream: #fbf6ea;
+  --cream-deep: #f6ecd6;
+  --sunrise: #f5820b;
+  --sunrise-deep: #d96e04;
+  --teal: #0fb5a6;
+  --paper: #ffffff;
+  --ink: #232323;
+  --ink-soft: #5b5b6b;
+  --line: #e8e4da;
+  --font-display: var(--font-fraunces), var(--font-bangla), Georgia, serif;
+  --font-body: var(--font-nunito), var(--font-bangla), var(--font-korean), system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-navy: var(--navy);
+  --color-navy-deep: var(--navy-deep);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-cream: var(--cream);
+  --color-cream-deep: var(--cream-deep);
+  --color-sunrise: var(--sunrise);
+  --color-sunrise-deep: var(--sunrise-deep);
+  --color-teal: var(--teal);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Bangla and Korean text get their proper faces */
+:lang(bn) {
+  font-family: var(--font-bangla), sans-serif;
+}
+:lang(ko) {
+  font-family: var(--font-korean), sans-serif;
+}
+
+/* ---------- prose styling for CMS markdown ---------- */
+.prose-bcsk {
+  line-height: 1.75;
+}
+.prose-bcsk h2 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 1.6em 0 0.6em;
+}
+.prose-bcsk h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 1.4em 0 0.5em;
+}
+.prose-bcsk p {
+  margin: 0.8em 0;
+}
+.prose-bcsk ul,
+.prose-bcsk ol {
+  margin: 0.8em 0 0.8em 1.4em;
+}
+.prose-bcsk ul {
+  list-style: disc;
+}
+.prose-bcsk ol {
+  list-style: decimal;
+}
+.prose-bcsk li {
+  margin: 0.3em 0;
+}
+.prose-bcsk a {
+  color: var(--sky);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-bcsk strong {
+  color: var(--navy);
+}
+.prose-bcsk blockquote {
+  border-left: 3px solid var(--sunrise);
+  padding-left: 1em;
+  color: var(--ink-soft);
+  margin: 1em 0;
+}
+.prose-bcsk table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 0.95rem;
+}
+.prose-bcsk th {
+  background: var(--cream);
+  color: var(--navy);
+  text-align: left;
+  font-weight: 700;
+}
+.prose-bcsk th,
+.prose-bcsk td {
+  border: 1px solid var(--line);
+  padding: 0.6em 0.9em;
+}
+.prose-bcsk em {
+  color: var(--ink-soft);
+}
+
+/* ---------- signature: floating trilingual speech bubbles ---------- */
+@keyframes bcsk-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.bubble-float {
+  animation: bcsk-float 5s ease-in-out infinite;
+}
+.bubble-float-slow {
+  animation: bcsk-float 7s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+.bubble-float-slower {
+  animation: bcsk-float 9s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bubble-float,
+  .bubble-float-slow,
+  .bubble-float-slower {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* dotted decorative pattern (screenshot motif) */
+.dot-grid {
+  background-image: radial-gradient(var(--line) 2px, transparent 2px);
+  background-size: 16px 16px;
+}
+
+/* visible focus for keyboard users */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* print styles for certificates/receipts/ID cards */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}
