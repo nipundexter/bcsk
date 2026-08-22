@@ -16,11 +16,15 @@ The complete web platform for **Bangladesh Community School, Korea** — public 
 ```bash
 npm install
 npx prisma dev --name bcsk   # starts a local Postgres; copy the DATABASE_URL it prints
-cp .env.example .env         # paste the DATABASE_URL (and SHADOW_DATABASE_URL) into .env
+cp .env.example .env         # paste DATABASE_URL (pooled) and DIRECT_URL (unpooled) into .env
 npx prisma migrate deploy    # creates the schema
 npm run db:seed              # loads real bcskr.org content + demo accounts
 npm run dev                  # http://localhost:3000
 ```
+
+> **One env file.** The project uses `.env` only. Do not run `vercel env pull` — it recreates
+> `.env.local` and `.env.production.local`, which Next loads *above* `.env` and which carried a
+> stale database URL and empty overrides. Production values belong in the Vercel dashboard.
 
 ## Deploying to Vercel
 
@@ -35,7 +39,14 @@ npm run dev                  # http://localhost:3000
    (PowerShell: `$env:DATABASE_URL="<url>"; npx prisma migrate deploy` then `npm run db:seed`.)
 5. Redeploy. The build runs `prisma generate` automatically (`postinstall`).
 
-### Demo accounts (password `bcsk1234` for all)
+### Demo accounts
+
+> **SEC-2:** the shared `bcsk1234` password no longer exists. `npm run db:seed` now generates a
+> random password and prints it once; pass `ALLOW_DEMO_PASSWORD=1` for the old shared password in
+> local development only (the seed refuses it when `NODE_ENV=production`). Every seeded account is
+> flagged `mustChangePassword`, so the first login goes to `/change-password` before the portal
+> opens. To rotate credentials on an existing database:
+> `npx tsx prisma/rotate-passwords.ts --apply`.
 
 | Surface | URL | Login |
 |---|---|---|
@@ -66,7 +77,7 @@ English (default), বাংলা, and 한국어 — switcher in the top bar. U
 2. **Toss Payments live keys** — replace `TOSS_CLIENT_KEY` / `TOSS_SECRET_KEY` (currently the public sandbox keys). Any Korean PG with a confirm-API works with small changes in `src/lib/payments.ts`.
 3. **SMTP credentials** — set `SMTP_HOST/PORT/USER/PASS/FROM`; until then emails are simulated (logged, or saved to `storage/outbox/` where the disk is writable).
 4. **Zoom** — teachers paste meeting links per session (works today). For API-generated meetings, set the `ZOOM_*` env vars and extend `LiveControls`.
-5. **Google reCAPTCHA** — set `RECAPTCHA_SITE_KEY` / `RECAPTCHA_SECRET_KEY` to enforce bot checks on the application and contact forms (skipped while empty).
+5. **Google reCAPTCHA** — ⚠️ **do not set `RECAPTCHA_SECRET_KEY` yet (SEC-9).** No reCAPTCHA widget is rendered anywhere, so no token is ever submitted; setting the secret makes every application and contact submission fail. Render the widget first, or drop the server-side checks.
 6. **JWT_SECRET** — set a strong random value.
 7. **Backups** — user uploads live in the database (`FileBlob` table, served role-checked via `/api/files/...`), so backing up the database backs up everything (NFR-REL-02).
 
@@ -75,3 +86,4 @@ English (default), বাংলা, and 한국어 — switcher in the top bar. U
 - Payment card data never touches this server — cards are tokenized by the gateway (PCI-DSS SAQ-A); only a transaction reference and status are stored (NFR-SEC-03).
 - Student personal data is collected with parental consent at application time (PIPA / NFR-LEGAL-01); the Privacy and Refund policies are linked in the footer of every page (NFR-LEGAL-02).
 - In development, the payment page shows a **"DEV: simulate successful card payment"** button (hidden in production builds) so the whole admission flow can be exercised without the gateway.
+- Card payment is offered only when both `TOSS_CLIENT_KEY` and `TOSS_SECRET_KEY` are set (SEC-2.1); otherwise the payment page shows bank transfer only rather than a checkout that cannot complete.

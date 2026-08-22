@@ -1,0 +1,66 @@
+# BCSK on a DigitalOcean droplet.
+#
+# Two containers plus Caddy. Caddy over Nginx because it obtains and renews TLS
+# certificates automatically on a single host, which removes the most common source of
+# "the site went down and nobody noticed" on a small deployment.
+#
+# Postgres is deliberately NOT here: it stays on Neon for managed backups and
+# point-in-time recovery. Moving it onto the droplet is a separate decision with its own
+# operational cost.
+
+services:
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+    expose:
+      - "4000"
+    # Not published to the host: only Caddy may reach the API, so the droplet's firewall
+    # has one fewer open port to get wrong.
+    networks: [bcsk]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Baked in at build time — Next inlines NEXT_PUBLIC_* into the client bundle.
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_URL:-https://bcskr.org/api/v1}
+        NEXT_PUBLIC_BASE_URL: ${PUBLIC_WEB_URL:-https://bcskr.org}
+    restart: unless-stopped
+    env_file: ./frontend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Server-side calls go container-to-container and never leave the host.
+      BACKEND_API_URL: http://api:4000/api/v1
+    expose:
+      - "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [bcsk]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificates — losing this means re-issuing on every restart
+      - caddy_config:/config
+    depends_on: [web, api]
+    networks: [bcsk]
+
+networks:
+  bcsk:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,77 @@
+{
+  "name": "bcsk-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:contract": "vitest run tests/contract",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "postinstall": "node scripts/sync-schema.mjs && prisma generate",
+    "sync:schema": "node scripts/sync-schema.mjs",
+    "check:schema": "node scripts/sync-schema.mjs --check"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "isomorphic-dompurify": "^3.19.0",
+    "jose": "^6.2.3",
+    "marked": "^18.0.5",
+    "next": "16.2.10",
+    "nodemailer": "^9.0.3",
+    "pdfkit": "^0.19.1",
+    "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pdfkit": "^0.17.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.0",
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.11"
+  },
+  "description": "BCSK web app (Next.js). Consumes the backend API; owns no business logic.",
+  "_transitional": {
+    "note": "These exist only until Phase D repoints every page at the backend API. The backend owns this logic; the frontend copies are scheduled for deletion, not for extension. Do not write new code against them.",
+    "dependencies": [
+      "@prisma/client",
+      "bcryptjs",
+      "isomorphic-dompurify",
+      "jose",
+      "marked",
+      "nodemailer",
+      "pdfkit",
+      "prisma",
+      "qrcode"
+    ],
+    "alsoDelete": [
+      "prisma/",
+      "scripts/sync-schema.mjs",
+      "src/lib/db.ts",
+      "DATABASE_URL / DIRECT_URL / JWT_SECRET in .env"
+    ],
+    "tracking": "docs/ARCHITECTURE-SEPARATION.md — Phase D"
+  }
+}

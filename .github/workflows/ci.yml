@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck · Lint · Unit tests
+    runs-on: ubuntu-latest
+    env:
+      # QUAL-2: src/lib/env.ts throws when JWT_SECRET is missing (SEC-1, by design), so the
+      # build and the tests need one. This is a throwaway CI value, not a real secret.
+      JWT_SECRET: ci-placeholder-secret-at-least-32-chars-long
+      # Prisma only needs a parseable URL to generate the client; nothing here connects.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/bcsk
+      DIRECT_URL: postgresql://user:pass@localhost:5432/bcsk
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    # The admission funnel writes real rows, so it needs a real database.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bcsk
+          POSTGRES_PASSWORD: bcsk
+          POSTGRES_DB: bcsk
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      JWT_SECRET: ci-placeholder-secret-at-least-32-chars-long
+      DATABASE_URL: postgresql://bcsk:bcsk@localhost:5432/bcsk
+      DIRECT_URL: postgresql://bcsk:bcsk@localhost:5432/bcsk
+      NEXT_PUBLIC_BASE_URL: http://localhost:3000
+      ALLOW_DEMO_PASSWORD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply schema and seed
+        run: |
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E suite
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
