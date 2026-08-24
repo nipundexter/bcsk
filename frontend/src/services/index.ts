@@ -52,6 +52,8 @@ export const site = {
       0,
     ),
   specialCourses: () => api.public<T.Course[]>("/public/special-courses", 300),
+  /** Homepage "campus right now" widget. Short cache — reflects real teacher-toggled state. */
+  campusStatus: () => api.public<T.CampusStatus>("/public/campus-status", 30),
   /** Answers for anonymous visitors too — an empty list, not an error. */
   enrolledCourseSlugs: () => api.get<string[]>("/classroom/enrolled-courses"),
   recordGameScore: (game: string, level: number, score: number) =>

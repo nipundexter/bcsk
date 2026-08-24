@@ -19,6 +19,10 @@ const PAGE_ROUTES: Record<string, string> = {
   "book-list": "/academic/book-list",
   syllabus: "/academic/syllabus",
   "academic-calendar": "/academic/calendar",
+  "class-schedule": "/academic/class-schedule",
+  "why-bcsk": "/#school-overview",
+  "mission-vision": "/#school-overview",
+  "education-management": "/#school-overview",
   "privacy-policy": "/privacy-policy",
   "refund-policy": "/refund-policy",
 };

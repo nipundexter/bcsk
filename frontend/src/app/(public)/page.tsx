@@ -7,16 +7,42 @@ import { CLASS_LEVELS } from "@/lib/constants";
 export default async function HomePage() {
   const { lang, t } = await getDict();
   // A missing CMS page must not take the homepage down, so each is caught individually.
-  const [hero, welcome, stats, allCourses, allTeachers, news] = await Promise.all([
+  const [
+    hero,
+    welcome,
+    stats,
+    allCourses,
+    allTeachers,
+    news,
+    whyBcsk,
+    missionVision,
+    educationManagement,
+    chairmanMsg,
+    principalMsg,
+    campusStatus,
+  ] = await Promise.all([
     cms.page("home-hero", lang).catch(() => null),
     cms.page("about-us", lang).catch(() => null),
     getSettings(["stat_total_students", "stat_total_classes", "stat_special_courses", "stat_teachers_staff"]),
     site.specialCourses(),
     cms.teachers(),
     cms.news(3),
+    cms.page("why-bcsk", lang).catch(() => null),
+    cms.page("mission-vision", lang).catch(() => null),
+    cms.page("education-management", lang).catch(() => null),
+    cms.page("message-chairman", lang).catch(() => null),
+    cms.page("message-principal", lang).catch(() => null),
+    site.campusStatus().catch(() => null),
   ]);
   const specialCourses = allCourses.slice(0, 6);
   const teachers = allTeachers.slice(0, 4);
+  // Real, attributed excerpts only — chairman and principal have full published messages to
+  // pull from. No quote is invented for a role (ambassador, guardian, community leader) that
+  // has no real content behind it yet.
+  const voices = [
+    chairmanMsg,
+    principalMsg,
+  ].filter((v): v is NonNullable<typeof v> => Boolean(v));
 
   const statCards = [
     { label: t.home.stats_students, value: stats.stat_total_students ?? "30", color: "bg-sunrise" },
@@ -110,6 +136,49 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ---------------- CAMPUS RIGHT NOW ---------------- */}
+      {campusStatus && (
+        <section className="mx-auto max-w-7xl px-4 mt-10">
+          <h2 className="text-xs font-extrabold uppercase tracking-wide text-ink-soft mb-3">
+            {t.home.campusStatus}
+          </h2>
+          <div className="bg-white border border-line rounded-2xl px-6 py-5 flex flex-wrap items-center gap-5">
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide ${
+                campusStatus.open ? "bg-teal/10 text-teal" : "bg-cream text-ink-soft"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${campusStatus.open ? "bg-teal animate-pulse" : "bg-ink-soft/40"}`}
+                aria-hidden
+              />
+              {campusStatus.open ? t.common.live : t.home.campusClosedMsg}
+            </span>
+
+            {campusStatus.open ? (
+              <div className="flex flex-wrap gap-2">
+                {campusStatus.sessions.map((s) => (
+                  <span
+                    key={s.id}
+                    className="text-xs font-bold text-navy bg-sky-soft rounded-full px-3 py-1.5"
+                    title={s.teacherName ?? undefined}
+                  >
+                    {s.title} · {s.students} {t.common.enrolled.toLowerCase()}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            <Link
+              href="/academic/class-schedule"
+              className="ml-auto text-sky text-xs font-bold hover:underline underline-offset-4 whitespace-nowrap"
+            >
+              {t.home.viewFullSchedule} →
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* ---------------- THREE PILLARS ---------------- */}
       <section className="mx-auto max-w-7xl px-4 mt-16 grid sm:grid-cols-3 gap-8">
         {[
@@ -151,6 +220,53 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ---------------- SCHOOL OVERVIEW ---------------- */}
+      {(whyBcsk || missionVision || educationManagement) && (
+        <section id="school-overview" className="mx-auto max-w-7xl px-4 mt-20 scroll-mt-24">
+          <h2 className="font-display text-3xl font-semibold text-ink mb-8">{t.home.overview}</h2>
+          <div className="grid lg:grid-cols-3 gap-5">
+            {whyBcsk && (
+              <div className="bg-white border border-line rounded-2xl p-6">
+                <h3 className="font-display text-lg font-semibold text-navy">{t.home.whyBcsk}</h3>
+                <div
+                  className="mt-3 prose-bcsk text-[14px] text-ink-soft leading-relaxed [&_ul]:space-y-2 [&_ul]:pl-4"
+                  dangerouslySetInnerHTML={{ __html: whyBcsk.html }}
+                />
+              </div>
+            )}
+            {missionVision && (
+              <div className="bg-white border border-line rounded-2xl p-6">
+                <h3 className="font-display text-lg font-semibold text-navy">{t.home.missionVision}</h3>
+                <div
+                  className="mt-3 prose-bcsk text-[14px] text-ink-soft leading-relaxed [&_h2]:text-sm [&_h2]:font-extrabold [&_h2]:text-sunrise [&_h2]:uppercase [&_h2]:tracking-wide [&_h2]:mt-4 [&_h2]:first:mt-0"
+                  dangerouslySetInnerHTML={{ __html: missionVision.html }}
+                />
+              </div>
+            )}
+            {educationManagement && (
+              <div className="bg-white border border-line rounded-2xl p-6">
+                <h3 className="font-display text-lg font-semibold text-navy">{t.home.educationManagement}</h3>
+                <div
+                  className="mt-3 prose-bcsk text-[14px] text-ink-soft leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: educationManagement.html }}
+                />
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs font-bold">
+                  <Link href="/bcsk/teachers" className="text-sky hover:underline underline-offset-4">
+                    {t.home.viewTeachers} →
+                  </Link>
+                  <Link href="/academic/class-schedule" className="text-sky hover:underline underline-offset-4">
+                    {t.home.viewSchedule} →
+                  </Link>
+                  <Link href="/admission/tuition-fee" className="text-sky hover:underline underline-offset-4">
+                    {t.home.tuitionFeesLink} →
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ---------------- REGULAR CLASSES QUICK BAR (FR-HOME-05) ---------------- */}
       <section className="mx-auto max-w-7xl px-4 mt-20">
@@ -258,6 +374,34 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ---------------- VOICES FROM BCSK ---------------- */}
+      {voices.length > 0 && (
+        <section className="bg-cream mt-20 py-16">
+          <div className="mx-auto max-w-7xl px-4">
+            <h2 className="font-display text-3xl font-semibold text-ink mb-8">{t.home.voices}</h2>
+            <div className="grid sm:grid-cols-2 gap-6">
+              {voices.map((v) => (
+                <div key={v.slug} className="relative bg-white rounded-2xl p-7 shadow-sm">
+                  <span className="absolute top-5 right-6 font-display text-5xl text-sky-soft select-none" aria-hidden>
+                    “
+                  </span>
+                  <div
+                    className="relative prose-bcsk text-sm text-ink-soft leading-relaxed line-clamp-6 [&_strong]:text-navy"
+                    dangerouslySetInnerHTML={{ __html: v.html }}
+                  />
+                  <Link
+                    href={`/bcsk/${v.slug}`}
+                    className="relative inline-block mt-4 text-sky font-bold text-xs uppercase tracking-wide hover:underline underline-offset-4"
+                  >
+                    {t.common.readFullMessage} →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ---------------- CTA BAND ---------------- */}
       <section className="mx-auto max-w-7xl px-4 mt-20">

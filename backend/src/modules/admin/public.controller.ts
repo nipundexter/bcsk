@@ -40,6 +40,9 @@ export class PublicController {
   @Public() @Get("special-courses")
   specialCourses() { return this.admin.specialCourses(); }
 
+  @Public() @Get("campus-status")
+  campusStatus() { return this.admin.campusStatus(); }
+
   @Public() @Get("curriculum")
   curriculum() { return this.admin.curriculum(); }
 

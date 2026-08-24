@@ -133,6 +133,19 @@ export type CurriculumEntry = {
   displayOrder: number;
 };
 
+export type CampusStatus = {
+  open: boolean;
+  liveCount: number;
+  sessions: {
+    id: number;
+    title: string;
+    courseName: string;
+    classLevel: string | null;
+    teacherName: string | null;
+    students: number;
+  }[];
+};
+
 /** A student as related records reference them. */
 export type StudentRef = { id: number; name: string; studentProfile: StudentProfile | null };
 

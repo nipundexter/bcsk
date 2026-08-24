@@ -38,6 +38,7 @@ export async function Header() {
         { label: t.nav.curriculum, href: "/academic/curriculum" },
         { label: t.nav.syllabus, href: "/academic/syllabus" },
         { label: t.nav.academicCalendar, href: "/academic/calendar" },
+        { label: t.nav.classSchedule, href: "/academic/class-schedule" },
         { label: t.nav.deen, href: "/courses/deen" },
         { label: t.nav.ielts, href: "/courses/ielts-for-kids" },
         { label: t.nav.abacus, href: "/courses/abacus" },

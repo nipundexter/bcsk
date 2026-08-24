@@ -607,6 +607,41 @@ export class AdminService {
     });
   }
 
+  /**
+   * Homepage "campus right now" widget. Reads the same `isLive` flag a teacher toggles from
+   * their own class page (`office.setLive`) — real state a teacher set, never a schedule
+   * guess, so there is no timezone or day-of-week matching to get wrong. Attendee counts are
+   * aggregate (a number), the same class of fact already public via the homepage stat cards.
+   */
+  async campusStatus() {
+    const sessions = await this.prisma.classSession.findMany({
+      where: { semester: SEMESTER_CURRENT, active: true },
+      select: {
+        id: true,
+        title: true,
+        classLevel: true,
+        isLive: true,
+        course: { select: { name: true } },
+        teacher: { select: { user: { select: { name: true } } } },
+        _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
+      },
+      orderBy: [{ isLive: "desc" }, { title: "asc" }],
+    });
+    const live = sessions.filter((s) => s.isLive);
+    return {
+      open: live.length > 0,
+      liveCount: live.length,
+      sessions: live.map((s) => ({
+        id: s.id,
+        title: s.title,
+        courseName: s.course.name,
+        classLevel: s.classLevel,
+        teacherName: s.teacher?.user.name ?? null,
+        students: s._count.enrollments,
+      })),
+    };
+  }
+
   publishedCornerPosts() {
     return this.prisma.studentCornerPost.findMany({
       where: { published: true },

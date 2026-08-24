@@ -2,11 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "bcsk-dev",
+      "name": "bcsk-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000,
-      "cwd": "D:\SF\bcsk\code"
+      "runtimeArgs": ["--prefix", "backend", "run", "start:dev"],
+      "port": 4000
+    },
+    {
+      "name": "bcsk-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 3000
     }
   ]
 }

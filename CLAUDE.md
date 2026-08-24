@@ -112,8 +112,11 @@ Backend API docs at `http://localhost:4000/api/v1/docs` (Swagger, generated from
 **The API path is configuration, not a constant.** `API_PREFIX` and `API_VERSION` in
 `backend/.env` build the global prefix via `src/config/api.ts`; blanks fall back to `api/v1` and
 stray slashes are trimmed. Never hard-code `/api/v1` — import `apiBasePath()` / `apiBaseUrl()`.
-Three places repeat the value because they cannot read the .env: the Caddyfile, the Docker
-healthcheck (both derive it from the same variable names), and `frontend/.env`, which must match.
+Two places repeat the value because they cannot read the .env: each Dockerfile's own
+`HEALTHCHECK` (`backend/Dockerfile`, `frontend/Dockerfile`) and `frontend/.env`, which must
+match. There is no Caddyfile or `docker-compose.yml` any more — deployment moved off that stack
+(23 Aug 2026); if that route ever comes back, the API path is still the same variable names
+here, not a new constant.
 
 ## Stack
 
