@@ -1,11 +1,11 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { FeeRow } from "./FeeRow";
 
 /** FR-ADMIN-05: fee configuration by class/level, BCSK vs non-BCSK. */
 export default async function FeesPage() {
   await requirePermission("fees:manage");
-  const fees = await db.feeConfig.findMany({ orderBy: { displayOrder: "asc" } });
+  const fees = await admin.fees();
 
   return (
     <div className="max-w-4xl">

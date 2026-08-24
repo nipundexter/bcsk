@@ -1,25 +1,19 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 
 export default async function AdminDashboard() {
   await requireAdmin();
-  const [pendingPayments, pendingApps, openTickets, students, teachers, unansweredQ] = await Promise.all([
-    db.payment.count({ where: { status: "PENDING_VERIFICATION" } }),
-    db.applicationForm.count({ where: { status: { in: ["PENDING_PAYMENT", "PENDING_VERIFICATION", "PAID"] } } }),
-    db.supportTicket.count({ where: { status: "OPEN" } }),
-    db.user.count({ where: { role: "STUDENT", active: true } }),
-    db.user.count({ where: { role: "TEACHER", active: true } }),
-    db.question.count({ where: { answer: null } }),
-  ]);
+  // One endpoint, six counts — previously six separate queries issued from the page.
+  const stats = await admin.dashboard();
 
   const cards = [
-    { label: "Payments to verify", value: pendingPayments, href: "/admin/payments", color: "bg-sunrise", urgent: pendingPayments > 0 },
-    { label: "Open applications", value: pendingApps, href: "/admin/admissions", color: "bg-sky", urgent: false },
-    { label: "Open support tickets", value: openTickets, href: "/admin/tickets", color: "bg-teal", urgent: openTickets > 0 },
-    { label: "Active students", value: students, href: "/admin/users?role=STUDENT", color: "bg-navy", urgent: false },
-    { label: "Teachers", value: teachers, href: "/admin/users?role=TEACHER", color: "bg-navy", urgent: false },
-    { label: "Unanswered questions", value: unansweredQ, href: "/admin/dashboard", color: "bg-sky", urgent: false },
+    { label: "Payments to verify", value: stats.paymentsToVerify, href: "/admin/payments", color: "bg-sunrise", urgent: stats.paymentsToVerify > 0 },
+    { label: "Open applications", value: stats.openApplications, href: "/admin/admissions", color: "bg-sky", urgent: false },
+    { label: "Open support tickets", value: stats.openTickets, href: "/admin/tickets", color: "bg-teal", urgent: stats.openTickets > 0 },
+    { label: "Active students", value: stats.students, href: "/admin/users?role=STUDENT", color: "bg-navy", urgent: false },
+    { label: "Teachers", value: stats.teachers, href: "/admin/users?role=TEACHER", color: "bg-navy", urgent: false },
+    { label: "Unanswered questions", value: stats.unanswered, href: "/admin/dashboard", color: "bg-sky", urgent: false },
   ];
 
   return (

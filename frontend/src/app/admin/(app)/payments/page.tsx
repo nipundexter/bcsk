@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { krw } from "@/lib/payments";
+import { payments as paymentsApi } from "@/services";
+import { krw } from "@/lib/format";
 import { PaymentRowActions } from "./PaymentRowActions";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -18,18 +18,18 @@ const STATUS_STYLE: Record<string, string> = {
 export default async function AdminPaymentsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   await requirePermission("payments:read");
   const { filter = "all" } = await searchParams;
-  const where =
-    filter === "pending"
-      ? { status: "PENDING_VERIFICATION" }
-      : filter === "confirmed"
-      ? { status: { in: ["PAID", "VERIFIED"] } }
-      : {};
-  const payments = await db.payment.findMany({
-    where,
-    include: { application: true, payer: true, verifiedBy: true },
-    orderBy: [{ status: "desc" }, { createdAt: "desc" }],
-    take: 200,
-  });
+  // The ledger is one endpoint; the three tabs are a view over it, so the filter and the
+  // status-then-date ordering are applied here rather than round-tripped as query state.
+  const all = await paymentsApi.list();
+  const payments = all
+    .filter((p) =>
+      filter === "pending"
+        ? p.status === "PENDING_VERIFICATION"
+        : filter === "confirmed"
+        ? ["PAID", "VERIFIED"].includes(p.status)
+        : true,
+    )
+    .sort((a, b) => b.status.localeCompare(a.status) || b.createdAt.localeCompare(a.createdAt));
 
   const tabs = [
     ["all", "All"],

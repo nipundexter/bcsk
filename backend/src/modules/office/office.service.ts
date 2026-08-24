@@ -42,7 +42,9 @@ export class OfficeService {
         orderBy: { createdAt: "desc" },
         take: 8,
       }),
-      this.prisma.question.count({ where: { teacherUserId: actor.userId, answer: null } }),
+      // `answeredAt` rather than `answer`: both are written together by answerQuestion, but
+      // only this one matches @@index([teacherUserId, answeredAt]) and the admin dashboard.
+      this.prisma.question.count({ where: { teacherUserId: actor.userId, answeredAt: null } }),
     ]);
     return { profile, sessions, notifications, openQuestions };
   }
@@ -72,7 +74,13 @@ export class OfficeService {
     if (!teacher) throw notFound("Teacher profile");
     return this.prisma.classSession.findMany({
       where: { teacherId: teacher.id, active: true },
-      include: { course: true, level: true, _count: { select: { enrollments: true } } },
+      // Same ACTIVE-only rule as the dashboard, which otherwise reports a smaller number
+      // than this page for the very same class.
+      include: {
+        course: true,
+        level: true,
+        _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
+      },
       orderBy: { id: "asc" },
     });
   }

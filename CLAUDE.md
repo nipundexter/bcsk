@@ -1,4 +1,4 @@
-@AGENTS.md
+@frontend/AGENTS.md
 
 # BCSK Platform
 
@@ -11,18 +11,21 @@ code/
   docs/       shared documentation
 ```
 
-> **▶ ACTIVE TASK: migrate the 32 admin files off Prisma.**
-> Start at **[docs/PHASE-D-ADMIN-HANDOFF.md](docs/PHASE-D-ADMIN-HANDOFF.md)** — it has the
-> file-by-file SDK mapping, four known gotchas, and the definition of done. Public, classroom
-> and office are already migrated and verified; admin is the last piece.
+Each project carries its own `package.json` and lockfile and installs independently. There is
+no root manifest and no workspace linking them — treat them as two repositories that happen to
+share a directory.
+
+> **The frontend/backend split is complete.** All four surfaces read the backend through the
+> typed SDK in `frontend/src/services/`; the web app has no database client, no `JWT_SECRET` and
+> no Prisma dependency. `docs/PHASE-D-ADMIN-HANDOFF.md` is kept as the record of the last phase,
+> not as a task.
 
 **Read these before non-trivial work. They are the source of truth; the artifacts are copies.**
 
 - **[docs/ARCHITECTURE-SEPARATION.md](docs/ARCHITECTURE-SEPARATION.md)** — the split.
-  **Backend is complete** (116 endpoints) and so are mobile auth and the deployment files.
-  **Phase C/D: public, classroom and office are migrated and verified; the 32 admin files are
-  the only ones still reading Prisma.** Migrate them onto `@/services` — the recipe and the
-  four gotchas found doing the other three surfaces are in the plan.
+  **Backend is complete** (117 endpoints) and so are mobile auth and the deployment files.
+  **Phases A-G are done:** all four surfaces read the API, and the transitional Prisma layer in
+  the frontend has been deleted. Phase H (real-time) is designed, not built.
 - **[docs/CODEBASE-REVIEW.md](docs/CODEBASE-REVIEW.md)** — security and performance findings
   (`SEC-n`, `BUG-n`, `PERF-n`, `QUAL-n`) with status. All of these were fixed in the pre-split
   code and **must survive the migration** — that is risk R1.
@@ -34,7 +37,7 @@ code/
 
 | | backend | frontend |
 |---|---|---|
-| Prisma / SQL | **yes, exclusively** | transitional only — see below |
+| Prisma / SQL | **yes, exclusively** | **never** — it has no database client |
 | Business rules, fees, auth | **yes** | never |
 | Secrets | **yes** | never — `NEXT_PUBLIC_*` ships to the browser |
 | Rendering, forms, routing | no | **yes** |
@@ -51,26 +54,58 @@ code/
 - **`AppErrorFilter` is the only place** a thrown value becomes a status code.
 - Permissions are served from `GET /auth/me`; never duplicate the map in the frontend.
 
-**Transitional — expires at the end of Phase D**
+**How the frontend reads data**
 
-The frontend still queries the database directly for pages not yet repointed. `frontend/package.json`
-has a `_transitional` block listing every dependency, file and env var scheduled for deletion.
-`frontend/prisma/schema.prisma` is a **derived copy** — the backend owns the schema; run
-`npm run check:schema` to detect drift. **Write no new frontend code against any of it.**
+Every page and Server Action goes through `frontend/src/services/index.ts` — a typed SDK grouped
+by domain over `api-client.ts`, the one place that forwards the session cookie, unwraps the
+`{ data }` envelope, and turns a backend `AppError` into a typed `ApiError`. Response shapes are
+hand-written in `services/types.ts` on purpose: the contract is narrower than the tables.
+
+Three things the API boundary changes, all of which have bitten:
+
+- **Dates are ISO strings, not `Date`.** Use `formatDate` / `isoAttr` / `dayOfMonth` from
+  `@/lib/dates`; `.toLocaleDateString()` on an API value is a runtime error.
+- **Overriding an optional relation needs `Omit`**, not an intersection:
+  `Omit<T.Payment, "payer"> & { payer: X }`.
+- **Every export in a `"use server"` file must be `async`.** An arrow const returning a promise
+  compiles and then 500s with an opaque *"Ecmascript file had an error"*.
+
+When a page needs a field an endpoint does not return, **widen the endpoint explicitly** — never
+by re-including a whole row. Several `include: true`s were shipping `passwordHash` to the web
+tier before Phase D narrowed them.
 
 ## Commands
 
+**There is no root `package.json`.** `backend/` and `frontend/` are two independent npm
+projects, each with its own manifest and lockfile; every command runs against one of them.
+Nothing orchestrates both, so running the full stack means two terminals.
+
+**`npm --prefix <dir> run <script>` works, but `npm --prefix <dir> install` does not** — with no
+root manifest it reads `package.json` from the *current* directory and exits ENOENT. Installing
+means `cd` into the project.
+
 ```bash
-npm run install:all      # both projects
-npm run dev              # api :4000 and web :3000 together
-npm run dev:api          # backend only
-npm run build            # both
-npm run typecheck        # both
-npm run test             # both
-npm run test:e2e         # playwright, web surface
-npm run db:migrate       # prisma migrate deploy (backend)
-npm run db:seed
+# backend — NestJS API on :4000
+cd backend && npm install
+npm --prefix backend run start:dev     # watch mode
+npm --prefix backend run build
+npm --prefix backend run typecheck
+npm --prefix backend run test
+npm --prefix backend run db:migrate    # prisma migrate deploy
+npm --prefix backend run db:seed
 ```
+
+```bash
+# frontend — Next.js web on :3000
+cd frontend && npm install
+npm --prefix frontend run dev
+npm --prefix frontend run build
+npm --prefix frontend run typecheck
+npm --prefix frontend run test
+npm --prefix frontend run test:e2e     # playwright, needs both services running
+```
+
+`npm --prefix backend run lint` still fails outright — the backend has no `eslint.config.js`.
 
 Backend API docs at `http://localhost:4000/api/v1/docs` (Swagger, generated from the running app).
 
@@ -87,44 +122,44 @@ Next.js 16 App Router · React 19 · TypeScript (strict) · Tailwind 4 · Prisma
 
 ## Architecture in one paragraph
 
-A server-first modular monolith. **No REST layer** — Server Components read Prisma directly, and
-mutations are Server Actions co-located with their page. The six `route.ts` handlers exist only
-where HTTP semantics are required (file bytes, PDFs, CSV, the Toss redirect). The four "surfaces"
-are route groups (`(public)/`, `classroom/(app)/`, `office/(app)/`, `admin/(app)/`), not separate
-deployments: they share one Prisma client, one session cookie, and one database. There is **no
-`middleware.ts`** — access control is a guard function called at the top of each layout and each
-action.
+Two deployables. The NestJS API owns Prisma, every secret and all business logic; the Next.js app
+renders. Server Components read through the typed SDK, and mutations are Server Actions co-located
+with their page, each calling a single SDK method. File bytes, PDFs, CSV and the Toss redirect are
+backend routes reached through the rewrites in `next.config.ts`, so stored `/api/files/...` URLs
+stay valid. The four "surfaces" are route groups (`(public)/`, `classroom/(app)/`, `office/(app)/`,
+`admin/(app)/`) sharing one session cookie. Access control is a guard function at the top of each
+layout and each action — defence in depth, since the API enforces independently; `src/proxy.ts`
+exists only for security headers.
 
 ## Conventions to follow
 
 - **Mutations are `actions.ts` files** co-located with the page, marked `"use server"`, returning
   `{ ok?: boolean; error?: string } | null` and driven by `useActionState`. Match the existing
   shape; do not introduce API routes for mutations.
-- **Every server action must re-derive the session and re-check authorisation from its own
-  arguments.** Server Actions compile to public HTTP endpoints — a caller can pass any argument.
-  `ownSession()` in `src/app/office/(app)/classes/[id]/actions.ts` is the reference pattern.
-- **Never trust an ID, price, or flag that arrives from the client.** Read the authoritative record
-  (`FeeConfig`, the stored `ApplicationForm`, the verified session) instead. See finding SEC-3.
-- **Admin mutations call `audit(...)`** after the write, then `revalidatePath(...)`.
-- **Multi-step writes belong in `db.$transaction`.** See finding BUG-2.
+- **An action guards, calls one SDK method, and revalidates.** Wrap the call in `toActionError(e)`
+  so a 4xx becomes a message on the form and a 5xx still reaches the error boundary.
+- **Every server action still re-checks authorisation.** Server Actions compile to public HTTP
+  endpoints — a caller can pass any argument. The guard here renders the 403 boundary; the API
+  refuses the call regardless.
+- **Never trust an ID, price, or flag that arrives from the client.** The backend reads the
+  authoritative record (`FeeConfig`, the stored `ApplicationForm`, the verified session). See SEC-3.
+- **Do not write audit rows from the frontend** — `audit()` no longer exists there. Each backend
+  admin operation records its own, in the same transaction as the write.
+- **Multi-step writes belong in a backend `$transaction`.** See finding BUG-2.
 - Path alias is `@/*` → `./src/*`.
 - Domain constants live in `src/lib/constants.ts`; DB columns are `String` with the valid values in
   a schema comment (a known weakness — finding QUAL-1).
 
-## Commands
+## Before a commit
+
+Both projects must pass, and there is no root script to do it in one go:
 
 ```bash
-npm run dev                  # dev server
-npm run build                # production build
-npm run lint                 # eslint
-npm run typecheck            # tsc --noEmit
-npm run test                 # vitest unit tests
-npm run test:e2e             # playwright end-to-end
-npx prisma migrate deploy    # apply migrations
-npx prisma db seed           # seed content + demo accounts
+npm --prefix backend run typecheck && npm --prefix backend run test
+npm --prefix frontend run typecheck && npm --prefix frontend run test
 ```
 
-Run `npm run typecheck && npm run test` before any commit; see **Testing** below.
+See **Testing** below.
 
 ## Environment
 
@@ -134,7 +169,8 @@ build at the wrong database. **Do not run `vercel env pull`.**
 
 - `backend/.env` — `DATABASE_URL` (pooled) + `DIRECT_URL` (unpooled, required by Prisma Migrate),
   `JWT_SECRET`, Toss, SMTP, Cloudinary, `CORS_ORIGINS`.
-- `frontend/.env` — `BACKEND_API_URL`, `NEXT_PUBLIC_*` only, plus the transitional database vars.
+- `frontend/.env` — `BACKEND_API_URL` and `NEXT_PUBLIC_*` only. **No secret, no database
+  credential.** The build must succeed with neither present; that is the standing acceptance test.
 
 **Read every env var through `requiredSecret` / `intFromEnv`, never `process.env.X ?? fallback`.**
 `??` does not fire on the empty string. This has caused four separate defects here —
@@ -155,7 +191,7 @@ string, which is how both `JWT_SECRET` and `SESSION_HOURS` silently broke in pro
 always false in production). All 12 seeded accounts were rotated and carry `mustChangePassword`,
 enforced inside every `require*` guard. Any code path that issues a credential on someone's behalf
 — `createUser`, `resetUserPassword`, `activateEnrollmentForApplication`, the seed — **must** set
-`mustChangePassword: true`. Rotate with `npm run db:rotate-passwords -- --apply` (dry-run without
+`mustChangePassword: true`. Rotate with `npm --prefix backend run db:rotate-passwords -- --apply` (dry-run without
 `--apply`).
 
 **SEC-2.1 is fixed in handling, not in config.** `PaymentConfigError` separates our
@@ -183,7 +219,7 @@ payment adoption (`payerUserId`) and application status in one `$transaction`; t
 email is sent after it commits and cannot fail the activation.
 
 **SEC-6 / SEC-8 / SEC-9 fixed.** `renderMarkdown` sanitises through DOMPurify — never render CMS
-HTML without it. `src/middleware.ts` sets a nonce-based CSP and the other security headers; if you
+HTML without it. `src/proxy.ts` sets a nonce-based CSP and the other security headers; if you
 add an external script or API origin it must be allowlisted there or it will be blocked. Rate
 limiting is DB-backed in `src/lib/rate-limit.ts` (in-memory does not work on serverless) and fails
 open by design. reCAPTCHA now has a real widget and fails closed; the two keys must both be set or
@@ -199,17 +235,18 @@ to a signed URL rather than stream bytes.
 ## Testing
 
 ```bash
-npm run test         # Vitest — 61 unit tests (fees, permissions, env, tokens, sanitiser)
-npm run test:e2e     # Playwright — 14 E2E, boots its own dev server
+npm --prefix backend run test    # Vitest — 40 (env, tokens, permissions, dashboard counts)
+npm --prefix frontend run test   # Vitest — 31 (fees, permissions, sanitiser)
+npm --prefix frontend run test:e2e   # Playwright — 14 E2E, needs both services and a seeded database
 ```
 
-Unit tests mock Prisma and must stay database-free. `vitest.config.ts` injects a `JWT_SECRET`
-because `src/lib/env.ts` throws without one. E2E needs a seeded database. CI
+Unit tests are database-free. E2E writes real rows — the admission-funnel test leaves an
+`E2E Applicant ...` application behind; clean it up when running against a live database. CI
 (`.github/workflows/ci.yml`) runs typecheck, lint, unit tests and build, plus E2E against a
 Postgres service container.
 
-Lint currently reports **29 pre-existing errors** (mostly unescaped apostrophes in JSX) in files
-untouched by the security work. Don't let that number grow; it is not yet zero.
+`npm --prefix frontend run lint` reports **28 pre-existing errors** (mostly unescaped
+apostrophes in JSX). Don't let that number grow; it is not yet zero.
 
 **Do not set `RECAPTCHA_SECRET_KEY`** without first fixing SEC-9. No client-side reCAPTCHA widget
 exists, so `recaptchaToken` is never submitted; setting the secret makes `verifyRecaptcha` reject

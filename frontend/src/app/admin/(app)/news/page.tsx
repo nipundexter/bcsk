@@ -1,11 +1,12 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
+import { isoAttr } from "@/lib/dates";
 import { NewsEditor } from "./NewsEditor";
 
 /** FR-NEWS-01 (admin side): manage news, seminars, and events. */
 export default async function AdminNewsPage() {
   await requirePermission("content:manage");
-  const items = await db.eventNews.findMany({ orderBy: { date: "desc" } });
+  const items = await admin.news();
 
   return (
     <div className="max-w-3xl">
@@ -16,7 +17,8 @@ export default async function AdminNewsPage() {
           type: n.type,
           title: n.title,
           body: n.body,
-          date: n.date.toISOString().slice(0, 10),
+          // <input type="date"> wants yyyy-mm-dd; the API sends a full ISO timestamp.
+          date: (isoAttr(n.date) ?? "").slice(0, 10),
           published: n.published,
         }))}
       />

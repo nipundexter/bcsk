@@ -1,6 +1,6 @@
 # BCSK — API-First Separation Plan
 
-**Status:** Phases A, B, E, F, G complete · **Phase C/D: public, classroom and office done; admin remaining** · Phase H designed
+**Status:** Phases A, B, C, D, E, F, G complete · Phase H designed
 **Companions:** [CODEBASE-REVIEW.md](CODEBASE-REVIEW.md) · [CONTENT-GAP-ANALYSIS.md](CONTENT-GAP-ANALYSIS.md)
 
 ## Decisions taken
@@ -315,26 +315,31 @@ code/
   package.json convenience scripts across both
 ```
 
-### The transitional period, and how it ends
+### The transitional period, and how it ended
 
-The frontend still queries the database directly for the 52 pages not yet repointed — your
-execution rule is *don't break what works*, so it keeps working while the backend is built out.
-That is explicitly temporary. `frontend/package.json` carries a `_transitional` block naming
-every dependency, file and environment variable scheduled for deletion:
+While the backend was being built, the frontend kept querying the database directly for the
+pages not yet repointed — the execution rule is *don't break what works*. `frontend/package.json`
+carried a `_transitional` block naming every dependency, file and environment variable scheduled
+for deletion.
+
+**All of it is gone as of 23 Aug 2026.** Deleted with the admin migration:
 
 - `@prisma/client`, `prisma`, `bcryptjs`, `jose`, `marked`, `isomorphic-dompurify`, `nodemailer`,
-  `pdfkit`, `qrcode`
-- `frontend/prisma/` (a **derived** copy — `npm run check:schema` fails if it drifts from the
-  backend's authoritative schema), `scripts/sync-schema.mjs`, `src/lib/db.ts`
+  `pdfkit`, `qrcode` and their `@types/*` — the web app's dependency list is now `next`, `react`,
+  `react-dom`, `server-only`, `zod`
+- `frontend/prisma/` (the derived schema copy), `scripts/sync-schema.mjs`, `src/lib/db.ts`,
+  the `postinstall` schema-sync, and the `sync:schema` / `check:schema` scripts
 - `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` from `frontend/.env`
+- `serverExternalPackages` from `next.config.ts`, and the Prisma steps from `frontend/Dockerfile`
 
-**Phase D ends when all of that is deleted.** Until then: no new frontend code may be written
-against them.
+The acceptance test is that `npm --prefix frontend run build` succeeds with no database
+credentials anywhere in the environment. It does.
 
 ## Migration plan
 
 Each phase is independently shippable and leaves the app working. **No phase may land with a
-failing `npm run test` or `npm run test:e2e`** — the existing 61 unit and 14 E2E tests are the
+failing unit or E2E suite** (`npm --prefix backend run test`,
+`npm --prefix frontend run test`, `npm --prefix frontend run test:e2e`) — the existing unit and E2E tests are the
 regression harness for the security work, and they must stay green throughout.
 
 ### Phase A — Scaffolding ✅ **COMPLETE (22 Aug 2026)** — no behaviour change
@@ -388,7 +393,7 @@ regression harness for the security work, and they must stay green throughout.
 - Permissions are served from `GET /auth/me` rather than duplicated in the frontend, so the UI
   and the API can never disagree (SEC-4 / SEC-5).
 
-### Phase C / D — Repoint the frontend  ⚠️ **ADMIN REMAINING**
+### Phase C / D — Repoint the frontend  ✅ **COMPLETE (23 Aug 2026)**
 
 | Surface | State |
 |---|---|
@@ -397,13 +402,23 @@ regression harness for the security work, and they must stay green throughout.
 | **Public** (24 files) | ✅ **done** — every page 200s against the split stack with real data |
 | **Classroom** (13 files) | ✅ **done** |
 | **Office** (8 files) | ✅ **done** |
-| **Admin** (32 files) | ☐ still reads Prisma directly |
+| **Admin** (32 files) | ✅ **done** |
 
-`frontend/.env` is already reduced to URLs — no `DATABASE_URL`, no `JWT_SECRET`, no
-`API_PREFIX`/`API_VERSION`, no `NODE_ENV`/`PORT`. The two database URLs remain **only** because
-the 32 admin files still query directly; they go the moment those are migrated.
+`frontend/.env` is URLs only. `grep -rl '@/lib/db' frontend/src` returns nothing, and the web
+app's `node_modules` no longer contains Prisma at all.
 
-**Things learned migrating three surfaces, worth knowing before the fourth:**
+**Endpoints widened or narrowed for the admin surface** (all in the same spirit — say exactly
+what the page needs, never re-expose a row):
+
+| Endpoint | Change | Why |
+|---|---|---|
+| `POST /admissions/:id/corrections` | **new** | The "request corrections" decision had no endpoint; it is not a rejection — the application stays live and the note is stored on `correctionNote`. |
+| `GET /payments` | `application` / `payer` / `verifiedBy` narrowed from `include: true` to explicit selects | `payer` and `verifiedBy` are `User` rows, so the ledger was shipping `passwordHash` to the browser tier. Also adds `application.id` for the row link. |
+| `GET /admin/students` | `select` instead of `include`, plus `_count.examResults` | Same `passwordHash` leak; the Reports table shows a results count. |
+| `GET /admin/sessions` | adds `_count.enrollments`, narrows `teacher.user` to a name | The scheduling table shows an enrolment count; the teacher's `User` row was fully included. |
+| `GET /users` | adds `studentProfile.classLevel` and `teacherProfile.designation` | The Users table shows the class or designation under the name. |
+
+**Things learned migrating the four surfaces:**
 
 - **Dates are strings now.** JSON has no date type, so `.toLocaleDateString()` on an API value
   is a runtime error. `src/lib/dates.ts` (`formatDate`, `isoAttr`, `dayOfMonth`) exists for this
@@ -517,8 +532,8 @@ Playwright config. Read every environment variable through `requiredSecret` or `
 
 **Phase A** ☐ server dirs ☐ error taxonomy ☐ Actor ☐ resolveActor ☐ withApi ☐ ESLint boundary ☐ contract harness
 **Phase B** ☐ cms ☐ file+Cloudinary ☐ user ☐ auth ☐ classroom ☐ office ☐ admission ☐ payment
-**Phase C** ☐ 25 action files repointed ☐ E2E green
-**Phase D** ☐ 52 pages repointed ☐ zero `@/lib/db` imports under `src/app/**`
+**Phase C** ☑ 25 action files repointed ☑ E2E green
+**Phase D** ☑ 52 pages repointed ☑ zero `@/lib/db` imports under `src/app/**` ☑ transitional layer deleted
 **Phase E** ☐ endpoints ☐ contract tests ☐ OpenAPI published
 **Phase F** ☐ RefreshToken migration ☐ token endpoints ☐ rotation + reuse detection ☐ CORS allowlist
 **Phase G** ☐ standalone output ☐ Dockerfile ☐ compose ☐ Caddy TLS ☐ staging ☐ health check ☐ runbook

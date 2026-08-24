@@ -17,13 +17,22 @@ export class UserService {
     private readonly mail: MailService,
   ) {}
 
+  /**
+   * The account list the Users module renders. `select`, never `include` — `passwordHash`
+   * lives on this table.
+   *
+   * The two profile relations are here because the table shows a student's class and a
+   * teacher's designation under their name; each is narrowed to just that field.
+   */
   async list() {
     return this.prisma.user.findMany({
       select: {
         id: true, loginId: true, name: true, email: true, role: true,
         active: true, mustChangePassword: true, createdAt: true,
+        studentProfile: { select: { classLevel: true } },
+        teacherProfile: { select: { designation: true } },
       },
-      orderBy: { id: "asc" },
+      orderBy: [{ role: "asc" }, { id: "asc" }],
     });
   }
 

@@ -20,6 +20,7 @@ const cell = "w-24 rounded border border-line px-2 py-1.5 text-xs text-right foc
 export function FeeRow({ fee }: { fee: Fee }) {
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <tr className="border-t border-line">
@@ -27,12 +28,27 @@ export function FeeRow({ fee }: { fee: Fee }) {
         <span className="font-bold text-ink">{fee.label}</span>
         <span className="block text-[10px] text-ink-soft">{fee.kind.replace(/_/g, " ")}</span>
       </td>
-      <FormCells fee={fee} pending={pending} saved={saved} onSave={(fd) => start(async () => { await updateFee(fee.id, fd); setSaved(true); setTimeout(() => setSaved(false), 2000); })} />
+      <FormCells
+        fee={fee}
+        pending={pending}
+        saved={saved}
+        error={error}
+        onSave={(fd) =>
+          start(async () => {
+            const result = await updateFee(fee.id, fd);
+            setError(result.error ?? null);
+            if (!result.error) {
+              setSaved(true);
+              setTimeout(() => setSaved(false), 2000);
+            }
+          })
+        }
+      />
     </tr>
   );
 }
 
-function FormCells({ fee, pending, saved, onSave }: { fee: Fee; pending: boolean; saved: boolean; onSave: (fd: FormData) => void }) {
+function FormCells({ fee, pending, saved, error, onSave }: { fee: Fee; pending: boolean; saved: boolean; error: string | null; onSave: (fd: FormData) => void }) {
   // one form per row via form attribute
   const formId = `fee-${fee.id}`;
   return (
@@ -51,6 +67,7 @@ function FormCells({ fee, pending, saved, onSave }: { fee: Fee; pending: boolean
             Save
           </button>
           {saved && <span className="text-[11px] font-bold text-teal">✓</span>}
+          {error && <span className="text-[11px] font-semibold text-red-600">{error}</span>}
         </form>
       </td>
     </>

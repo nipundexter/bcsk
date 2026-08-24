@@ -2,17 +2,12 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-COPY scripts ./scripts
-# The schema copy is transitional (Phase D removes it); skip scripts and handle it in build.
-RUN npm ci --ignore-scripts
+RUN npm ci
 
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# TRANSITIONAL: needed only while the frontend still reads the database directly.
-COPY ../backend/prisma ./_backend-prisma
-RUN node scripts/sync-schema.mjs || true && npx prisma generate || true
 
 # NEXT_PUBLIC_* are inlined at build time, so the API URL must be present here, not at runtime.
 ARG NEXT_PUBLIC_API_BASE_URL

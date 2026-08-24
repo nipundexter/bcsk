@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { users as usersApi } from "@/services";
 import { UserRowActions } from "./UserRowActions";
 import { NewUserForm } from "./NewUserForm";
 
@@ -8,12 +8,9 @@ import { NewUserForm } from "./NewUserForm";
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ role?: string }> }) {
   await requirePermission("users:manage");
   const { role = "ALL" } = await searchParams;
-  const users = await db.user.findMany({
-    where: role === "ALL" ? {} : { role },
-    include: { studentProfile: true, teacherProfile: true },
-    orderBy: [{ role: "asc" }, { id: "asc" }],
-    take: 300,
-  });
+  // `/users` returns every account ordered by role then id; the tabs are a view over it.
+  const all = await usersApi.list();
+  const users = role === "ALL" ? all : all.filter((u) => u.role === role);
 
   const tabs = ["ALL", "STUDENT", "TEACHER", "ADMIN_SUPPORT", "IT_SUPPORT", "SUPER_ADMIN"];
 

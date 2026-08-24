@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin, type ContentPageRow } from "@/services";
 import { LANGS } from "@/lib/constants";
 
 /** FR-ADMIN-02: CMS module — all public content pages in all languages. */
 export default async function CmsListPage() {
   await requirePermission("content:manage");
-  const pages = await db.contentPage.findMany({ orderBy: [{ slug: "asc" }, { lang: "asc" }] });
+  const pages = await admin.pages();
 
-  const bySlug = new Map<string, typeof pages>();
+  const bySlug = new Map<string, ContentPageRow[]>();
   for (const p of pages) {
     bySlug.set(p.slug, [...(bySlug.get(p.slug) ?? []), p]);
   }
@@ -25,7 +25,7 @@ export default async function CmsListPage() {
         {[...bySlug.entries()].map(([slug, versions]) => (
           <div key={slug} className="px-5 py-3.5 flex flex-wrap items-center gap-3">
             <div className="min-w-52">
-              <p className="font-bold text-ink text-sm">{versions[0].title}</p>
+              <p className="font-bold text-ink text-sm">{versions[0]!.title}</p>
               <p className="text-[11px] text-ink-soft font-mono">{slug}</p>
             </div>
             <div className="flex gap-1.5 ml-auto">

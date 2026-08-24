@@ -28,6 +28,16 @@ export type UserRow = {
   createdAt: ISODate;
 };
 
+/**
+ * A row of the admin Users table: an account plus the one profile field shown beneath the
+ * name. Deliberately not the whole profile — the list has no use for a guardian's phone
+ * number, and `/users` does not return one.
+ */
+export type UserListRow = UserRow & {
+  studentProfile: { classLevel: string } | null;
+  teacherProfile: { designation: string | null } | null;
+};
+
 export type StudentProfile = {
   id: number;
   userId: number;
@@ -283,7 +293,8 @@ export type Payment = {
   verifiedAt: ISODate | null;
   createdAt: ISODate;
   updatedAt: ISODate;
-  application?: { applicantName: string } | null;
+  /** Populated by the staff ledger (`/payments`), absent from a student's own list. */
+  application?: { id: number; applicantName: string } | null;
   payer?: { name: string } | null;
   verifiedBy?: { name: string } | null;
 };

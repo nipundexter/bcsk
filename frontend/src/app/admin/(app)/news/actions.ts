@@ -1,28 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission, audit } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
+import { admin, toActionError } from "@/services";
 
 export type NewsState = { ok?: boolean; error?: string } | null;
 
+/** FR-NEWS-01 (admin side): one endpoint creates or updates, keyed on the presence of an id. */
 export async function saveNews(_prev: NewsState, formData: FormData): Promise<NewsState> {
-  const admin = await requirePermission("content:manage");
+  await requirePermission("content:manage");
   const id = Number(formData.get("id") ?? 0);
-  const data = {
-    type: String(formData.get("type") ?? "NEWS"),
-    title: String(formData.get("title") ?? "").trim(),
-    body: String(formData.get("body") ?? "").trim(),
-    date: new Date(String(formData.get("date") ?? new Date().toISOString().slice(0, 10))),
-    published: formData.get("published") === "on",
-  };
-  if (!data.title || !data.body) return { error: "Title and body are required." };
-  if (id) {
-    await db.eventNews.update({ where: { id }, data });
-  } else {
-    await db.eventNews.create({ data });
+  const title = String(formData.get("title") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!title || !body) return { error: "Title and body are required." };
+
+  try {
+    await admin.saveNews({
+      ...(id ? { id } : {}),
+      type: String(formData.get("type") ?? "NEWS"),
+      title,
+      body,
+      date: String(formData.get("date") ?? "") || new Date().toISOString().slice(0, 10),
+      published: formData.get("published") === "on",
+    });
+  } catch (e) {
+    return toActionError(e);
   }
-  await audit(admin.userId, "CONTENT_EDIT", "EventNews", id || "new", data.title);
   revalidatePath("/events/news");
   revalidatePath("/admin/news");
   revalidatePath("/");
@@ -30,9 +33,8 @@ export async function saveNews(_prev: NewsState, formData: FormData): Promise<Ne
 }
 
 export async function deleteNews(id: number) {
-  const admin = await requirePermission("content:manage");
-  await db.eventNews.delete({ where: { id } });
-  await audit(admin.userId, "CONTENT_DELETE", "EventNews", id);
+  await requirePermission("content:manage");
+  await admin.deleteNews(id);
   revalidatePath("/events/news");
   revalidatePath("/admin/news");
 }

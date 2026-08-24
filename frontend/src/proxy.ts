@@ -3,10 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * SEC-8: security headers for every response.
  *
- * The app previously sent none — no CSP, no HSTS, no framing protection — and there was no
- * middleware at all to add them centrally. This runs on the Edge runtime before every
- * request, so it cannot use Prisma; the rate limiting that needs the database lives in
+ * The app previously sent none — no CSP, no HSTS, no framing protection — and there was
+ * nothing at all to add them centrally. This runs on the Edge runtime before every request,
+ * so it cannot use Prisma; the rate limiting that needs the database lives in
  * `src/lib/rate-limit.ts` and is called from the sensitive server actions instead.
+ *
+ * Named `proxy` because Next 16.3 deprecated the `middleware` file convention in favour of
+ * `proxy`; the behaviour, the matcher and the nonce contract are unchanged.
  */
 
 /** External origins the app genuinely loads code or data from. */
@@ -49,7 +52,7 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
   ].join("; ");
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const isDev = process.env.NODE_ENV !== "production";
   const nonce = crypto.randomUUID().replace(/-/g, "");
   const csp = contentSecurityPolicy(nonce, isDev);

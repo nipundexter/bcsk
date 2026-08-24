@@ -173,6 +173,36 @@ export class AdmissionService {
     return { applicationId: id, activated: paid, ...result };
   }
 
+  /**
+   * Send an application back to the applicant with a note.
+   *
+   * Distinct from `reject`: the application stays live, the note is what the guardian is
+   * asked to fix, and it is stored on `correctionNote` so the applicant's own summary can
+   * show it. The rejection path overwrites `adminNote` and is terminal.
+   */
+  async requestCorrections(id: number, note: string, actor: Actor) {
+    const app = await this.prisma.applicationForm.update({
+      where: { id },
+      data: { status: "CORRECTIONS_REQUESTED", correctionNote: note },
+    });
+    if (app.email) {
+      // The note is staff-written but still reaches an HTML email body.
+      const escape = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      await this.mail.send(
+        app.email,
+        "BCSK application - correction needed",
+        this.mail.layout(
+          "One more step",
+          `<p style="font-size:14px;color:#232323">Your application for <b>${escape(app.applicantName)}</b> needs a small correction before we can proceed:</p>
+           <p style="font-size:14px;color:#232323;background:#fbf6ea;border-radius:8px;padding:12px">${escape(note)}</p>
+           <p style="font-size:14px;color:#232323">Reply to this email or contact the office with the corrected information.</p>`,
+        ),
+      );
+    }
+    await this.audit.record(actor.userId, "ADMISSION_DECISION", "ApplicationForm", id, `corrections: ${note}`);
+    return { applicationId: id, status: "CORRECTIONS_REQUESTED" };
+  }
+
   async reject(id: number, reason: string, actor: Actor) {
     const app = await this.prisma.applicationForm.update({
       where: { id },

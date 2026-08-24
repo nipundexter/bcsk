@@ -34,12 +34,20 @@ export class AdminService {
     const [paymentsToVerify, openApplications, openTickets, students, teachers, unanswered] =
       await Promise.all([
         this.prisma.payment.count({ where: { status: "PENDING_VERIFICATION" } }),
+        // "Open" is every non-terminal status. CORRECTIONS_REQUESTED was missing, so an
+        // application sent back to the applicant was counted nowhere while it sat in flight.
         this.prisma.applicationForm.count({
-          where: { status: { in: ["PENDING_PAYMENT", "PENDING_VERIFICATION", "PAID"] } },
+          where: {
+            status: {
+              in: ["PENDING_PAYMENT", "PENDING_VERIFICATION", "PAID", "CORRECTIONS_REQUESTED"],
+            },
+          },
         }),
         this.prisma.supportTicket.count({ where: { status: { not: "CLOSED" } } }),
-        this.prisma.studentProfile.count(),
-        this.prisma.teacherProfile.count(),
+        // Deactivation is a soft flag on User, so an unfiltered profile count includes every
+        // account ever switched off — the card says "Active students" and must mean it.
+        this.prisma.studentProfile.count({ where: { user: { active: true } } }),
+        this.prisma.teacherProfile.count({ where: { user: { active: true } } }),
         this.prisma.question.count({ where: { answeredAt: null } }),
       ]);
     return { paymentsToVerify, openApplications, openTickets, students, teachers, unanswered };
@@ -257,7 +265,7 @@ export class AdminService {
     return this.prisma.feeConfig.findMany({ orderBy: { displayOrder: "asc" } });
   }
 
-  async updateFee(id: number, input: Record<string, number | null | boolean>, actor: Actor) {
+  async updateFee(id: number, input: Record<string, unknown>, actor: Actor) {
     const n = (v: unknown) => (v === null || v === undefined || v === "" ? null : Math.max(0, Number(v) || 0));
     const row = await this.prisma.feeConfig.update({
       where: { id },
@@ -276,9 +284,20 @@ export class AdminService {
 
   /* ------------------------------- scheduling ------------------------------ */
 
+  /**
+   * Every class session with the three things the scheduling table shows beside it: which
+   * course and level it belongs to, who teaches it, and how many students are enrolled.
+   * The teacher's `User` row is narrowed to a name for the same reason as everywhere else.
+   */
   listSessions() {
     return this.prisma.classSession.findMany({
-      include: { course: true, level: true, teacher: { include: { user: true } } },
+      include: {
+        course: true,
+        level: true,
+        teacher: { select: { userId: true, user: { select: { name: true } } } },
+        // Current roster only: a cancelled or completed enrolment is not a student in the class.
+        _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
+      },
       orderBy: { id: "asc" },
     });
   }
@@ -374,10 +393,22 @@ export class AdminService {
 
   /* -------------------------------- reports -------------------------------- */
 
+  /**
+   * The student roster the Reports module renders: one row per student, the class they are
+   * in, and how many results are already on file.
+   *
+   * `select` rather than `include` — a `User` row carries `passwordHash`, and this endpoint
+   * feeds a page, not a trusted service.
+   */
   listStudents() {
     return this.prisma.user.findMany({
       where: { role: "STUDENT" },
-      include: { studentProfile: true },
+      select: {
+        id: true, loginId: true, name: true, email: true, role: true,
+        active: true, mustChangePassword: true, createdAt: true,
+        studentProfile: true,
+        _count: { select: { examResults: true } },
+      },
       orderBy: { id: "asc" },
     });
   }

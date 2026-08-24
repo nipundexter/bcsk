@@ -13,5 +13,3 @@ test-results
 storage/
 # SEC-2 credential rotation output — never commit
 rotated-credentials-*.txt
-# transitional: derived from backend/prisma/schema.prisma (Phase D deletes it)
-frontend/prisma/schema.prisma

@@ -1,29 +1,34 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission, audit } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
+import { admin, toActionError } from "@/services";
 
 export type GovState = { ok?: boolean; error?: string } | null;
 
+/** FR-ADMIN-11: governing body and regional representatives share one record type. */
 export async function saveMember(_prev: GovState, formData: FormData): Promise<GovState> {
-  const admin = await requirePermission("content:manage");
+  await requirePermission("content:manage");
   const id = Number(formData.get("id") ?? 0);
-  const data = {
-    kind: String(formData.get("kind") ?? "GOVERNING"),
-    name: String(formData.get("name") ?? "").trim(),
-    role: String(formData.get("role") ?? "").trim(),
-    organization: String(formData.get("organization") ?? "").trim() || null,
-    region: String(formData.get("region") ?? "").trim() || null,
-    phone: String(formData.get("phone") ?? "").trim() || null,
-    email: String(formData.get("email") ?? "").trim() || null,
-    bio: String(formData.get("bio") ?? "").trim() || null,
-    displayOrder: Number(formData.get("displayOrder") ?? 100) || 100,
-  };
-  if (!data.name || !data.role) return { error: "Name and role are required." };
-  if (id) await db.governingMember.update({ where: { id }, data });
-  else await db.governingMember.create({ data });
-  await audit(admin.userId, "CONTENT_EDIT", "GoverningMember", id || "new", data.name);
+  const text = (k: string) => String(formData.get(k) ?? "").trim();
+  if (!text("name") || !text("role")) return { error: "Name and role are required." };
+
+  try {
+    await admin.saveMember({
+      ...(id ? { id } : {}),
+      kind: text("kind") || "GOVERNING",
+      name: text("name"),
+      role: text("role"),
+      organization: text("organization"),
+      region: text("region"),
+      phone: text("phone"),
+      email: text("email"),
+      bio: text("bio"),
+      displayOrder: Number(formData.get("displayOrder") ?? 100) || 100,
+    });
+  } catch (e) {
+    return toActionError(e);
+  }
   revalidatePath("/bcsk/governing-body");
   revalidatePath("/bcsk/regional-representatives");
   revalidatePath("/admin/governing");
@@ -31,9 +36,8 @@ export async function saveMember(_prev: GovState, formData: FormData): Promise<G
 }
 
 export async function deleteMember(id: number) {
-  const admin = await requirePermission("content:manage");
-  await db.governingMember.delete({ where: { id } });
-  await audit(admin.userId, "CONTENT_DELETE", "GoverningMember", id);
+  await requirePermission("content:manage");
+  await admin.deleteMember(id);
   revalidatePath("/bcsk/governing-body");
   revalidatePath("/bcsk/regional-representatives");
   revalidatePath("/admin/governing");

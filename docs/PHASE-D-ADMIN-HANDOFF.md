@@ -1,4 +1,9 @@
-# Phase D — Admin surface migration (handoff)
+# Phase D - Admin surface migration (handoff)
+
+> **DONE - 23 Aug 2026.** All 32 admin files were migrated, the transitional Prisma layer was
+> deleted, and the frontend now builds with no database credentials present. This file is kept
+> as the record of what was done and what changed on the way; it is no longer a task.
+> Current state lives in [ARCHITECTURE-SEPARATION.md](ARCHITECTURE-SEPARATION.md).
 
 **Read this first, then [ARCHITECTURE-SEPARATION.md](ARCHITECTURE-SEPARATION.md) for context.**
 
@@ -90,6 +95,11 @@ defence in depth — the API refuses the call regardless.
 
 ## How to run it
 
+> **Superseded (23 Aug 2026).** The root `package.json` was removed; `backend/` and `frontend/`
+> are now independent npm projects with no orchestration between them. The commands recorded in
+> this document are kept as the historical record of the phase and no longer run as written —
+> see **Commands** in `CLAUDE.md` for the current per-project equivalents.
+
 ```bash
 npm run dev            # from code/ — starts api :4000 and web :3000 together
 ```
@@ -121,12 +131,19 @@ that is the actual acceptance test for this phase.
 
 ---
 
-## Current state
+## What actually happened
 
-- Backend: 116 endpoints, typechecks, builds, 32 tests green.
-- Frontend: public / classroom / office at **0** typecheck errors; admin is the only
-  remaining source of errors.
-- `frontend/.env` already holds URLs only, apart from the two database vars kept alive
-  solely for these 32 files.
-- **The working tree has a large number of uncommitted changes.** Consider committing
-  before starting, so the admin migration is a reviewable diff on its own.
+- **All 32 files migrated.** Both typecheck targets are at 0 errors, both projects build, and
+  the frontend `node_modules` no longer contains Prisma.
+- **One endpoint added:** `POST /admissions/:id/corrections` (117 total). "Request corrections"
+  had no backend equivalent - it is not a rejection, so `reject` could not stand in for it.
+- **Four endpoints narrowed, not widened.** `GET /payments`, `GET /admin/students`,
+  `GET /admin/sessions` and `GET /users` were `include`-ing whole `User` rows, so
+  `passwordHash` was crossing to the web tier. They now `select` the named fields, plus the
+  three counts the tables needed (`examResults`, `enrollments`) and the profile fields the
+  Users table shows.
+- **The audit log now pages.** It used to read `take: 300`; the endpoint is cursor-paginated
+  with a 100-row cap, so `api.getPage` was added to keep `meta.nextCursor` and the page has an
+  "Older entries" link rather than a silent truncation to 25.
+- **Actions surface API refusals.** The old versions returned early and silently when a
+  payment was in the wrong state; the backend now answers with a reason and the row shows it.

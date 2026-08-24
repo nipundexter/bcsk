@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admissions } from "@/services";
 import { classLevelLabel } from "@/lib/constants";
+import { formatDate } from "@/lib/dates";
 
 const STATUS_STYLE: Record<string, string> = {
   APPROVED: "bg-teal/15 text-teal",
@@ -15,7 +16,7 @@ const STATUS_STYLE: Record<string, string> = {
 /** FR-ADMIN-03: admissions review module. */
 export default async function AdmissionsPage() {
   await requirePermission("admissions:read");
-  const apps = await db.applicationForm.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
+  const apps = await admissions.list();
 
   return (
     <div>
@@ -41,7 +42,9 @@ export default async function AdmissionsPage() {
                 <td className="px-4 py-3.5 font-bold text-ink">{a.applicantName}</td>
                 <td className="px-4 py-3.5">{a.type === "REGULAR" ? "Regular" : "Special"}</td>
                 <td className="px-4 py-3.5">{a.grade ? classLevelLabel(a.grade) : a.courseName}</td>
-                <td className="px-4 py-3.5 text-ink-soft">{a.createdAt.toISOString().slice(0, 10)}</td>
+                <td className="px-4 py-3.5 text-ink-soft">
+                  {formatDate(a.createdAt, "en", { year: "numeric", month: "short", day: "numeric" })}
+                </td>
                 <td className="px-4 py-3.5">
                   <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 ${STATUS_STYLE[a.status] ?? "bg-cream"}`}>
                     {a.status.replace(/_/g, " ")}

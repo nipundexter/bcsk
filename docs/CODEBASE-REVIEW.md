@@ -1,6 +1,6 @@
 # BCSK Platform — Architecture & Code Review
 
-**Reviewed:** 22 Aug 2026 · **Commit:** `a0a218e` · **Stack:** Next.js 16.2.10 · React 19.2.4 · Prisma 6 · Neon Postgres
+**Reviewed:** 22 Aug 2026 · **Commit:** `a0a218e` · **Stack:** Next.js 16.3.2 (bumped from 16.2.10, 23 Aug 2026) · React 19.2.4 · Prisma 6 · Neon Postgres
 
 > Companion artifact (same content, rendered): https://claude.ai/code/artifact/64c1eeeb-b53f-468f-8e65-7a26254950ef
 > This file is the source of truth — update it first, then republish the artifact.
@@ -339,6 +339,37 @@ was `PENDING`; reconcile against Toss's webhook rather than relying solely on th
 
 ### Medium
 
+#### BUG-3 — Dashboard counts do not mean what their labels say
+`backend/src/modules/admin/admin.service.ts` · `backend/src/modules/office/office.service.ts`
+
+> **Status: FIXED (23 Aug 2026).** All four counts corrected and pinned by
+> `backend/test/dashboard-counts.test.ts` (8 tests asserting the query shape, database-free).
+
+Four separate miscounts, all of them silent — nothing threw, the cards simply reported figures
+that did not match their labels, which is the one class of defect a reader cannot catch by
+looking at the page.
+
+1. **"Active students" and "Teachers" counted deactivated accounts.** Deactivation is a soft
+   flag — `setActive` writes `User.active = false` and keeps the row — but the dashboard ran a
+   bare `studentProfile.count()` / `teacherProfile.count()`. Every account ever switched off was
+   still being reported as active staff or roll.
+2. **The same class showed two different roster sizes.** `office.dashboard` filtered enrolments
+   to `status: "ACTIVE"`; `office.myClasses` and `admin.listSessions` did not. A teacher saw one
+   number on their dashboard and a larger one — inflated by `CANCELLED`/`COMPLETED` rows — on
+   their classes page and in admin scheduling.
+3. **"Open applications" omitted `CORRECTIONS_REQUESTED`.** `APPROVED` and `REJECTED` are the
+   only terminal statuses, so an application handed back to the applicant for corrections was
+   in flight yet counted nowhere — the work simply disappeared from the dashboard until the
+   applicant resubmitted.
+4. **Unanswered questions were counted two different ways.** `office` filtered on `answer: null`
+   while `admin` used `answeredAt: null`. `answerQuestion` writes both, so the totals agreed by
+   luck; only `answeredAt` matches `@@index([teacherUserId, answeredAt])`.
+
+**Fix** — scope the profile counts through the relation (`where: { user: { active: true } }`),
+apply the same `status: "ACTIVE"` enrolment filter in all three `_count` selects, add
+`CORRECTIONS_REQUESTED` to the open-application list, and standardise on `answeredAt`.
+No schema change and no migration.
+
 #### PERF-1 — Not one non-unique index exists on 34 tables
 `prisma/schema.prisma` · `migrations/000000000000_init`
 
@@ -416,6 +447,10 @@ authorisation gate and have it redirect to a short-lived signed URL rather than 
 > password reset, applications and contact. It fails **open** on a database error — a limiter
 > outage must not lock every family out of the admission form; the controls that must fail
 > closed are enforced separately.
+>
+> **Renamed to `src/proxy.ts` (23 Aug 2026).** Next 16.3 deprecated the `middleware` file
+> convention in favour of `proxy`. File and exported function renamed; matcher, nonce
+> contract and every header are unchanged, verified at runtime against a dev server.
 
 Login, forgot-password, the application form, and the contact form are all unthrottled. reCAPTCHA
 is the only brake and it **passes automatically when the secret is unset** — the current state.

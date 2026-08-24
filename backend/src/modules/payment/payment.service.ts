@@ -285,9 +285,21 @@ export class PaymentService {
 
   /* -------------------------- Staff operations -------------------------- */
 
+  /**
+   * The payments ledger the admin table renders.
+   *
+   * The relations are selected field-by-field rather than included wholesale: `payer` and
+   * `verifiedBy` are `User` rows, and `include: true` shipped every column of them —
+   * `passwordHash` included — to the browser-facing tier. The table needs three names and
+   * an application id, so that is what it gets.
+   */
   async listForStaff() {
     return this.prisma.payment.findMany({
-      include: { application: true, payer: true, verifiedBy: true },
+      include: {
+        application: { select: { id: true, applicantName: true } },
+        payer: { select: { name: true } },
+        verifiedBy: { select: { name: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 200,
     });

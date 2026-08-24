@@ -153,7 +153,7 @@ export class AdminController {
   listFees() { return this.admin.listFees(); }
 
   @RequirePermission("fees:manage") @Patch("fees/:id")
-  updateFee(@Param("id") raw: string, @Body() body: Record<string, never>, @CurrentActor() a: Actor) {
+  updateFee(@Param("id") raw: string, @Body() body: Record<string, unknown>, @CurrentActor() a: Actor) {
     return this.admin.updateFee(idParam.parse(raw), body, a);
   }
 

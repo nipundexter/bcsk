@@ -7,10 +7,6 @@ const nextConfig: NextConfig = {
   // Phase G: emits a self-contained server plus only the node_modules actually used,
   // which is what the Docker runtime stage copies.
   output: "standalone",
-  // Keep these as runtime require()s instead of bundling them:
-  // pdfkit loads its .afm font data from disk (breaks when bundled),
-  // and nodemailer/prisma are happier unbundled on serverless.
-  serverExternalPackages: ["pdfkit", "nodemailer", "@prisma/client"],
   experimental: {
     // SEC-4.1: enables forbidden(), so a permission denial renders a real 403 boundary
     // instead of a silent redirect that would hide genuine authorisation bugs.

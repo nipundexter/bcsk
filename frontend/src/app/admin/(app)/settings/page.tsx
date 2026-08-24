@@ -1,5 +1,5 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { SettingsForm } from "./SettingsForm";
 
 const GROUPS: Array<{ title: string; note?: string; keys: Array<[string, string]> }> = [
@@ -50,7 +50,7 @@ const GROUPS: Array<{ title: string; note?: string; keys: Array<[string, string]
 /** FR-ADMIN-13: system settings. Super Admin only. */
 export default async function SettingsPage() {
   await requirePermission("settings:manage");
-  const all = await db.setting.findMany();
+  const all = await admin.settings();
   const values = Object.fromEntries(all.map((s) => [s.key, s.value]));
 
   return (

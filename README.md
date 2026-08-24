@@ -13,18 +13,30 @@ The complete web platform for **Bangladesh Community School, Korea** — public 
 
 ## Getting started
 
+`backend/` and `frontend/` are two independent npm projects. There is no root manifest, so each
+installs and runs on its own — the full stack needs two terminals.
+
 ```bash
+# backend — API on :4000
+cd backend
 npm install
-npx prisma dev --name bcsk   # starts a local Postgres; copy the DATABASE_URL it prints
-cp .env.example .env         # paste DATABASE_URL (pooled) and DIRECT_URL (unpooled) into .env
+cp .env.example .env         # DATABASE_URL (pooled), DIRECT_URL (unpooled), JWT_SECRET, …
 npx prisma migrate deploy    # creates the schema
 npm run db:seed              # loads real bcskr.org content + demo accounts
+npm run start:dev
+```
+
+```bash
+# frontend — web on :3000, in a second terminal
+cd frontend
+npm install
+cp .env.example .env         # BACKEND_API_URL and NEXT_PUBLIC_* only — no secrets
 npm run dev                  # http://localhost:3000
 ```
 
-> **One env file.** The project uses `.env` only. Do not run `vercel env pull` — it recreates
-> `.env.local` and `.env.production.local`, which Next loads *above* `.env` and which carried a
-> stale database URL and empty overrides. Production values belong in the Vercel dashboard.
+> **One `.env` per project, and neither has a `.env.local`.** Do not run `vercel env pull` — it
+> recreates `.env.local` and `.env.production.local`, which Next loads *above* `.env` and which
+> carried a stale database URL and empty overrides.
 
 ## Deploying to Vercel
 
@@ -34,14 +46,14 @@ npm run dev                  # http://localhost:3000
 4. From your machine, apply the schema and seed the production database:
    ```bash
    DATABASE_URL="<the Neon URL from Vercel>" npx prisma migrate deploy
-   DATABASE_URL="<the Neon URL from Vercel>" npm run db:seed
+   DATABASE_URL="<the Neon URL from Vercel>" npm --prefix backend run db:seed
    ```
-   (PowerShell: `$env:DATABASE_URL="<url>"; npx prisma migrate deploy` then `npm run db:seed`.)
+   (PowerShell: `$env:DATABASE_URL="<url>"; npx prisma migrate deploy` then `npm --prefix backend run db:seed`.)
 5. Redeploy. The build runs `prisma generate` automatically (`postinstall`).
 
 ### Demo accounts
 
-> **SEC-2:** the shared `bcsk1234` password no longer exists. `npm run db:seed` now generates a
+> **SEC-2:** the shared `bcsk1234` password no longer exists. `npm --prefix backend run db:seed` now generates a
 > random password and prints it once; pass `ALLOW_DEMO_PASSWORD=1` for the old shared password in
 > local development only (the seed refuses it when `NODE_ENV=production`). Every seeded account is
 > flagged `mustChangePassword`, so the first login goes to `/change-password` before the portal

@@ -1,16 +1,13 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { classLevelLabel } from "@/lib/constants";
 import { ResultEntryForm } from "./ResultEntryForm";
 
 /** FR-ADMIN-09: reports — certificates, result sheets, ID cards per student; result entry. */
 export default async function ReportsPage() {
   await requirePermission("reports:manage");
-  const students = await db.user.findMany({
-    where: { role: "STUDENT", active: true },
-    include: { studentProfile: true, _count: { select: { examResults: true } } },
-    orderBy: { id: "asc" },
-  });
+  // Deactivated accounts keep their records but are not offered for new documents.
+  const students = (await admin.students()).filter((s) => s.active);
 
   return (
     <div className="max-w-4xl">

@@ -48,7 +48,32 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
+type Envelope<T> = {
+  data?: T;
+  meta?: { nextCursor?: string | null };
+  error?: { code: ApiErrorCode; message: string; details?: Record<string, unknown>; requestId?: string };
+};
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return (await envelope<T>(path, options)).data as T;
+}
+
+/**
+ * A cursor-paginated read.
+ *
+ * List endpoints answer with `{ data, meta.nextCursor }`; `request` throws the meta away,
+ * which is right for the ninety-odd endpoints that return a whole collection and wrong for
+ * the two that are deliberately pages. Those callers use this and get the cursor.
+ */
+async function pageRequest<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ items: T[]; nextCursor: string | null }> {
+  const payload = await envelope<T[]>(path, options);
+  return { items: payload.data ?? [], nextCursor: payload.meta?.nextCursor ?? null };
+}
+
+async function envelope<T>(path: string, options: RequestOptions = {}): Promise<Envelope<T>> {
   const { method = "GET", body, auth = true, revalidate = false, tags, headers = {} } = options;
 
   const requestHeaders: Record<string, string> = { ...headers };
@@ -79,11 +104,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     });
   }
 
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) return {};
 
-  const payload = (await res.json().catch(() => null)) as
-    | { data?: T; meta?: unknown; error?: { code: ApiErrorCode; message: string; details?: Record<string, unknown>; requestId?: string } }
-    | null;
+  const payload = (await res.json().catch(() => null)) as Envelope<T> | null;
 
   if (!res.ok || payload?.error) {
     const err = payload?.error;
@@ -95,7 +118,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       err?.requestId,
     );
   }
-  return payload?.data as T;
+  return payload ?? {};
 }
 
 /**
@@ -134,6 +157,9 @@ export const api = {
   upload,
   get: <T>(path: string, opts?: Omit<RequestOptions, "method" | "body">) =>
     request<T>(path, { ...opts, method: "GET" }),
+  /** Like `get`, but keeps `meta.nextCursor` for endpoints that page. */
+  getPage: <T>(path: string, opts?: Omit<RequestOptions, "method" | "body">) =>
+    pageRequest<T>(path, { ...opts, method: "GET" }),
   post: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, "method" | "body">) =>
     request<T>(path, { ...opts, method: "POST", body }),
   patch: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, "method" | "body">) =>

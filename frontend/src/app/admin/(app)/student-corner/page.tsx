@@ -1,11 +1,11 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { CornerEditor } from "./CornerEditor";
 
 /** FR-NEWS-03 (admin side): curate student articles, poems, artwork, achievements. */
 export default async function AdminStudentCornerPage() {
   await requirePermission("content:manage");
-  const posts = await db.studentCornerPost.findMany({ orderBy: { createdAt: "desc" } });
+  const posts = await admin.cornerPosts();
 
   return (
     <div className="max-w-3xl">

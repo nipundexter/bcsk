@@ -1,5 +1,5 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { SEMESTER_CURRENT } from "@/lib/constants";
 import { SessionRow } from "./SessionRow";
 import { NewSessionForm } from "./NewSessionForm";
@@ -7,16 +7,22 @@ import { NewSessionForm } from "./NewSessionForm";
 /** FR-ADMIN-08: scheduling — assign teachers to sessions, manage the routine. */
 export default async function SchedulingPage() {
   await requirePermission("scheduling:manage");
-  const [sessions, teachers, courses] = await Promise.all([
-    db.classSession.findMany({
-      where: { semester: SEMESTER_CURRENT },
-      include: { teacher: { include: { user: true } }, course: true, level: true, _count: { select: { enrollments: true } } },
-      orderBy: [{ classLevel: "asc" }, { dayOfWeek: "asc" }, { startTime: "asc" }],
-    }),
-    db.teacherProfile.findMany({ include: { user: true }, orderBy: { displayOrder: "asc" } }),
-    db.course.findMany({ where: { active: true }, include: { levels: true }, orderBy: { displayOrder: "asc" } }),
+  const [allSessions, teachers, allCourses] = await Promise.all([
+    admin.sessions(),
+    admin.teachers(),
+    admin.courses(),
   ]);
 
+  // The endpoints are unfiltered lists; this screen is one semester's routine.
+  const sessions = allSessions
+    .filter((s) => s.semester === SEMESTER_CURRENT)
+    .sort(
+      (a, b) =>
+        (a.classLevel ?? "").localeCompare(b.classLevel ?? "") ||
+        a.dayOfWeek.localeCompare(b.dayOfWeek) ||
+        a.startTime.localeCompare(b.startTime),
+    );
+  const courses = allCourses.filter((c) => c.active);
   const teacherOptions = teachers.map((t) => ({ id: t.id, name: t.user.name }));
 
   return (

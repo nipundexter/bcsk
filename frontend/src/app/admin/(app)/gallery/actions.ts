@@ -1,57 +1,63 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission, audit } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { saveUpload } from "@/lib/uploads";
+import { requirePermission } from "@/lib/auth";
+import { admin, files, toActionError } from "@/services";
 
 export type GalleryState = { ok?: boolean; error?: string } | null;
 
+/**
+ * FR-ADMIN-10 — media gallery.
+ *
+ * Uploads go to `POST /files` with an allowlisted folder; the backend checks size, MIME and
+ * magic bytes and hands back a stored path. The `/api/files/…` prefix is kept on the saved
+ * URL because that is the shape already in the database and `next.config.ts` rewrites it to
+ * the backend — repointing it would invalidate every existing row.
+ */
 export async function createAlbum(_prev: GalleryState, formData: FormData): Promise<GalleryState> {
-  const admin = await requirePermission("content:manage");
+  await requirePermission("content:manage");
   const title = String(formData.get("title") ?? "").trim();
-  const category = String(formData.get("category") ?? "").trim() || null;
   if (!title) return { error: "Album title is required." };
-  await db.galleryAlbum.create({ data: { title, category } });
-  await audit(admin.userId, "GALLERY_ALBUM_CREATE", "GalleryAlbum", title);
+  const category = String(formData.get("category") ?? "").trim() || null;
+  try {
+    await admin.createAlbum(title, category);
+  } catch (e) {
+    return toActionError(e);
+  }
   revalidatePath("/admin/gallery");
   revalidatePath("/events/gallery");
   return { ok: true };
 }
 
-/** Gallery photos are public site content, stored as DB blobs (serverless-safe). */
 export async function addGalleryImage(_prev: GalleryState, formData: FormData): Promise<GalleryState> {
-  const admin = await requirePermission("content:manage");
+  await requirePermission("content:manage");
   const albumId = Number(formData.get("albumId"));
   const caption = String(formData.get("caption") ?? "").trim() || null;
-  const file = formData.get("image") as File | null;
-  if (!file || file.size === 0) return { error: "Choose an image." };
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image." };
   if (file.type === "application/pdf") return { error: "JPG, PNG, or WEBP only." };
 
-  const saved = await saveUpload(file, "gallery", 8 * 1024 * 1024);
-  if ("error" in saved) return { error: saved.error };
-
-  await db.galleryItem.create({
-    data: { albumId, url: `/api/files/${saved.path}`, caption },
-  });
-  await audit(admin.userId, "GALLERY_UPLOAD", "GalleryItem", saved.path);
+  try {
+    const { path } = await files.upload(file, "gallery");
+    await admin.addGalleryItem(albumId, `/api/files/${path}`, caption);
+  } catch (e) {
+    return toActionError(e);
+  }
   revalidatePath("/admin/gallery");
   revalidatePath("/events/gallery");
   return { ok: true };
 }
 
 export async function deleteGalleryItem(id: number) {
-  const admin = await requirePermission("content:manage");
-  await db.galleryItem.delete({ where: { id } });
-  await audit(admin.userId, "GALLERY_DELETE", "GalleryItem", id);
+  await requirePermission("content:manage");
+  await admin.deleteGalleryItem(id);
   revalidatePath("/admin/gallery");
   revalidatePath("/events/gallery");
 }
 
 export async function deleteAlbum(id: number) {
-  const admin = await requirePermission("content:manage");
-  await db.galleryAlbum.delete({ where: { id } });
-  await audit(admin.userId, "GALLERY_ALBUM_DELETE", "GalleryAlbum", id);
+  await requirePermission("content:manage");
+  await admin.deleteAlbum(id);
   revalidatePath("/admin/gallery");
   revalidatePath("/events/gallery");
 }

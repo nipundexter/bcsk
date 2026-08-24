@@ -1,14 +1,11 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { CourseEditor } from "./CourseEditor";
 
 /** FR-ADMIN-07: manage Course, Level, Syllabus, and Book records. */
 export default async function AdminCoursesPage() {
   await requirePermission("courses:manage");
-  const courses = await db.course.findMany({
-    include: { levels: { orderBy: { displayOrder: "asc" } } },
-    orderBy: { displayOrder: "asc" },
-  });
+  const courses = await admin.courses();
 
   return (
     <div className="max-w-4xl">

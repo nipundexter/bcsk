@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { approveApplication, rejectApplication, requestCorrections } from "./actions";
+import { approveApplication, rejectApplication, requestCorrections, type DecisionResult } from "./actions";
 
 export function DecisionButtons({ applicationId, status }: { applicationId: number; status: string }) {
   const [pending, start] = useTransition();
   const [mode, setMode] = useState<"none" | "reject" | "corrections">("none");
+  // The API can refuse a decision (already decided, missing payment record). Show it
+  // instead of letting the click appear to do nothing.
+  const [error, setError] = useState<string | null>(null);
+
+  const run = (fn: () => Promise<DecisionResult>) =>
+    start(async () => setError((await fn()).error ?? null));
 
   if (["APPROVED", "REJECTED"].includes(status)) {
     return <p className="text-sm text-ink-soft">Decision recorded. {status === "APPROVED" ? "Student account is active." : ""}</p>;
@@ -17,7 +23,7 @@ export function DecisionButtons({ applicationId, status }: { applicationId: numb
       <div className="flex flex-wrap gap-3">
         <button
           disabled={pending}
-          onClick={() => start(() => approveApplication(applicationId))}
+          onClick={() => run(() => approveApplication(applicationId))}
           className="bg-teal hover:bg-teal/85 disabled:opacity-60 text-white text-sm font-bold rounded-lg px-6 py-2.5 transition-colors"
         >
           ✓ Approve
@@ -36,7 +42,7 @@ export function DecisionButtons({ applicationId, status }: { applicationId: numb
         </button>
       </div>
       {mode === "corrections" && (
-        <form action={(fd) => start(() => requestCorrections(applicationId, fd))} className="mt-4 flex gap-2">
+        <form action={(fd) => run(() => requestCorrections(applicationId, fd))} className="mt-4 flex gap-2">
           <input
             name="note"
             required
@@ -47,7 +53,7 @@ export function DecisionButtons({ applicationId, status }: { applicationId: numb
         </form>
       )}
       {mode === "reject" && (
-        <form action={(fd) => start(() => rejectApplication(applicationId, fd))} className="mt-4 flex gap-2">
+        <form action={(fd) => run(() => rejectApplication(applicationId, fd))} className="mt-4 flex gap-2">
           <input
             name="reason"
             placeholder="Reason (emailed to the guardian)"
@@ -56,6 +62,7 @@ export function DecisionButtons({ applicationId, status }: { applicationId: numb
           <button disabled={pending} className="bg-red-600 text-white text-sm font-bold rounded-lg px-5 py-2.5">Confirm rejection</button>
         </form>
       )}
+      {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
       <p className="mt-3 text-xs text-ink-soft">
         Approving with a confirmed payment creates the student account and emails the Classroom credentials automatically (UC-2).
       </p>

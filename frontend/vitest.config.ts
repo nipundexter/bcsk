@@ -6,9 +6,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],
-    // JWT_SECRET must exist before src/lib/auth.ts or payment-token.ts is imported —
-    // requiredSecret() throws by design when it is missing (SEC-1).
-    env: { JWT_SECRET: "test-secret-at-least-32-characters-long-xxxx" },
+    // No JWT_SECRET here any more: the web app verifies nothing itself, it asks
+    // `GET /auth/me`. Injecting one would suggest it still owns a signing key.
     coverage: { provider: "v8", include: ["src/lib/**", "src/services/**"], reporter: ["text", "lcov"] },
   },
 });

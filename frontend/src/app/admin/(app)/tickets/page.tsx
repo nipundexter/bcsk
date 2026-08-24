@@ -1,11 +1,15 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
+import { formatDate } from "@/lib/dates";
 import { TicketActions } from "./TicketActions";
 
 /** FR-CONT-01 (admin side): support tickets from the contact form. */
 export default async function TicketsPage() {
   await requirePermission("tickets:manage");
-  const tickets = await db.supportTicket.findMany({ orderBy: [{ status: "asc" }, { createdAt: "desc" }] });
+  // Open first, then in-progress, then closed — which is what an ascending status sort gives.
+  const tickets = (await admin.tickets()).sort(
+    (a, b) => a.status.localeCompare(b.status) || b.createdAt.localeCompare(a.createdAt),
+  );
 
   return (
     <div className="max-w-3xl">
@@ -27,7 +31,7 @@ export default async function TicketsPage() {
             </div>
             <p className="mt-1 text-xs text-ink-soft">
               {t.name} · <a className="text-sky hover:underline" href={`mailto:${t.email}`}>{t.email}</a>
-              {t.phone ? ` · ${t.phone}` : ""} · {t.createdAt.toISOString().slice(0, 10)}
+              {t.phone ? ` · ${t.phone}` : ""} · {formatDate(t.createdAt)}
             </p>
             <p className="mt-3 text-sm text-ink whitespace-pre-line">{t.message}</p>
             {t.reply && (

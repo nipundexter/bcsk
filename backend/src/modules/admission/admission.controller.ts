@@ -63,6 +63,13 @@ export class AdmissionController {
   }
 
   @RequirePermission("admissions:decide")
+  @Post(":id/corrections")
+  corrections(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() actor: Actor) {
+    const { note } = z.object({ note: z.string().trim().min(1) }).parse(body);
+    return this.admissions.requestCorrections(idParam.parse(raw), note, actor);
+  }
+
+  @RequirePermission("admissions:decide")
   @Post(":id/reject")
   reject(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() actor: Actor) {
     const { reason } = z.object({ reason: z.string().trim().min(1) }).parse(body);

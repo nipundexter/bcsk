@@ -75,7 +75,15 @@ export const admissions = {
     api.post<ApplicationCreated>("/admissions/regular", input, { auth: false }),
   submitSpecial: (input: Record<string, unknown>) =>
     api.post<ApplicationCreated>("/admissions/special", input, { auth: false }),
-  list: (status?: string) => api.get<T.ApplicationForm[]>(`/admissions${status ? `?status=${status}` : ""}`),
+  /**
+   * The staff queue. Cursor-paginated server-side, so a limit is passed explicitly rather
+   * than relying on the 25-row default the admin table would silently truncate to.
+   */
+  list: (status?: string, limit = 100) => {
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (status) qs.set("status", status);
+    return api.get<T.ApplicationForm[]>(`/admissions?${qs}`);
+  },
   one: (id: number) => api.get<T.ApplicationForm>(`/admissions/${id}`),
   /** SEC-7: the applicant's own view, gated by the same capability token as payment. */
   summary: (id: number, token: string) =>
@@ -86,6 +94,9 @@ export const admissions = {
     }>(`/admissions/${id}/summary?token=${encodeURIComponent(token)}`, 0),
   approve: (id: number) => api.post<unknown>(`/admissions/${id}/approve`),
   reject: (id: number, reason: string) => api.post<unknown>(`/admissions/${id}/reject`, { reason }),
+  /** Sends the application back to the applicant with a note; it stays in the queue. */
+  requestCorrections: (id: number, note: string) =>
+    api.post<unknown>(`/admissions/${id}/corrections`, { note }),
 };
 
 /* --------------------------------- payment --------------------------------- */
@@ -202,7 +213,7 @@ export const office = {
 /* ---------------------------------- users ----------------------------------- */
 
 export const users = {
-  list: () => api.get<T.UserRow[]>("/users"),
+  list: () => api.get<T.UserListRow[]>("/users"),
   create: (input: Record<string, unknown>) =>
     api.post<{ loginId: string; temporaryPassword: string }>("/users", input),
   resetPassword: (id: number) => api.post<{ temporaryPassword: string }>(`/users/${id}/reset-password`),
@@ -241,7 +252,7 @@ export const admin = {
     api.post<T.StudentCornerPost>("/admin/student-corner", input),
   deleteCornerPost: (id: number) => api.delete<unknown>(`/admin/student-corner/${id}`),
 
-  courses: () => api.get<T.Course[]>("/admin/courses"),
+  courses: () => api.get<(Omit<T.Course, "levels"> & { levels: T.CourseLevel[] })[]>("/admin/courses"),
   updateCourse: (id: number, input: Record<string, unknown>) => api.patch<T.Course>(`/admin/courses/${id}`, input),
   updateLevel: (id: number, input: Record<string, unknown>) => api.patch<T.CourseLevel>(`/admin/levels/${id}`, input),
   addLevel: (courseId: number) => api.post<T.CourseLevel>(`/admin/courses/${courseId}/levels`),
@@ -249,7 +260,9 @@ export const admin = {
   fees: () => api.get<T.FeeConfig[]>("/admin/fees"),
   updateFee: (id: number, input: Record<string, unknown>) => api.patch<T.FeeConfig>(`/admin/fees/${id}`, input),
 
-  sessions: () => api.get<T.ClassSession[]>("/admin/sessions"),
+  /** Course, level, teacher and enrolment count are always populated here. */
+  sessions: () =>
+    api.get<(T.ClassSession & { _count: { enrollments: number } })[]>("/admin/sessions"),
   teachers: () => api.get<T.TeacherRow[]>("/admin/teachers"),
   updateSession: (id: number, input: Record<string, unknown>) =>
     api.patch<T.ClassSession>(`/admin/sessions/${id}`, input),
@@ -261,10 +274,21 @@ export const admin = {
   setTicketStatus: (id: number, status: string) =>
     api.patch<T.SupportTicket>(`/admin/tickets/${id}/status`, { status }),
 
-  students: () => api.get<(T.UserRow & { studentProfile: T.StudentProfile | null })[]>("/admin/students"),
+  students: () =>
+    api.get<(T.UserRow & { studentProfile: T.StudentProfile | null; _count: { examResults: number } })[]>(
+      "/admin/students",
+    ),
   addResult: (input: Record<string, unknown>) => api.post<T.ExamResult>("/admin/results", input),
 
-  auditLog: (cursor?: string) => api.get<T.AuditLogRow[]>(`/admin/audit${cursor ? `?cursor=${cursor}` : ""}`),
+  /**
+   * The audit log is genuinely long-lived and append-only, so it is the one admin read that
+   * pages: `nextCursor` comes back with the rows and drives the "older entries" link.
+   */
+  auditLog: (cursor?: string, limit = 100) => {
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (cursor) qs.set("cursor", cursor);
+    return api.getPage<T.AuditLogRow>(`/admin/audit?${qs}`);
+  },
 
   settings: () => api.get<T.Setting[]>("/admin/settings"),
   saveSettings: (values: Record<string, string>) => api.post<{ updated: number }>("/admin/settings", values),

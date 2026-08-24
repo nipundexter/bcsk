@@ -1,11 +1,11 @@
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
 import { GalleryManager } from "./GalleryManager";
 
 /** FR-ADMIN-10: media/gallery module. */
 export default async function AdminGalleryPage() {
   await requirePermission("content:manage");
-  const albums = await db.galleryAlbum.findMany({ include: { items: true }, orderBy: { id: "desc" } });
+  const albums = (await admin.albums()).sort((a, b) => b.id - a.id);
 
   return (
     <div className="max-w-4xl">

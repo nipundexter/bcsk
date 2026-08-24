@@ -1,14 +1,14 @@
+import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { admin } from "@/services";
+import { formatDate } from "@/lib/dates";
 
 /** FR-ADMIN-12: audit log of content changes, admission decisions, payment verifications. */
-export default async function AuditPage() {
+export default async function AuditPage({ searchParams }: { searchParams: Promise<{ cursor?: string }> }) {
   await requirePermission("audit:read");
-  const logs = await db.auditLog.findMany({
-    include: { user: { select: { name: true, loginId: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 300,
-  });
+  const { cursor } = await searchParams;
+  // Append-only and unbounded, so it is read a page at a time rather than "the last 300".
+  const { items: logs, nextCursor } = await admin.auditLog(cursor);
 
   return (
     <div className="max-w-4xl">
@@ -28,7 +28,11 @@ export default async function AuditPage() {
             {logs.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-ink-soft">No audit entries yet.</td></tr>}
             {logs.map((l) => (
               <tr key={l.id} className="border-t border-line">
-                <td className="px-4 py-2.5 text-ink-soft whitespace-nowrap">{l.createdAt.toISOString().slice(0, 16).replace("T", " ")}</td>
+                <td className="px-4 py-2.5 text-ink-soft whitespace-nowrap">
+                  {formatDate(l.createdAt, "en", {
+                    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                  })}
+                </td>
                 <td className="px-4 py-2.5 font-bold text-ink">{l.user?.name ?? "system"}</td>
                 <td className="px-4 py-2.5"><span className="text-[11px] font-bold bg-cream rounded-full px-2.5 py-1">{l.action}</span></td>
                 <td className="px-4 py-2.5">{l.entity}{l.entityId ? ` #${l.entityId}` : ""}</td>
@@ -38,6 +42,19 @@ export default async function AuditPage() {
           </tbody>
         </table>
       </div>
+      {nextCursor && (
+        <Link
+          href={`/admin/audit?cursor=${encodeURIComponent(nextCursor)}`}
+          className="mt-4 inline-block text-xs font-bold text-sky hover:underline"
+        >
+          Older entries →
+        </Link>
+      )}
+      {cursor && (
+        <Link href="/admin/audit" className="mt-4 ml-4 inline-block text-xs font-bold text-ink-soft hover:text-navy">
+          ← Back to newest
+        </Link>
+      )}
     </div>
   );
 }
