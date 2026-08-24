@@ -54,6 +54,7 @@ export const site = {
   specialCourses: () => api.public<T.Course[]>("/public/special-courses", 300),
   /** Homepage "campus right now" widget. Short cache — reflects real teacher-toggled state. */
   campusStatus: () => api.public<T.CampusStatus>("/public/campus-status", 30),
+  heroImages: () => api.public<T.HeroImage[]>("/public/hero-images", 300),
   /** Answers for anonymous visitors too — an empty list, not an error. */
   enrolledCourseSlugs: () => api.get<string[]>("/classroom/enrolled-courses"),
   recordGameScore: (game: string, level: number, score: number) =>
@@ -244,6 +245,11 @@ export const admin = {
     api.post<T.GalleryItem>("/admin/gallery/items", { albumId, url, caption }),
   deleteGalleryItem: (id: number) => api.delete<unknown>(`/admin/gallery/items/${id}`),
   deleteAlbum: (id: number) => api.delete<unknown>(`/admin/gallery/albums/${id}`),
+
+  heroImages: () => api.get<T.HeroImage[]>("/admin/hero-images"),
+  addHeroImage: (url: string, caption: string | null) =>
+    api.post<T.HeroImage>("/admin/hero-images", { url, caption }),
+  deleteHeroImage: (id: number) => api.delete<unknown>(`/admin/hero-images/${id}`),
 
   members: () => api.get<T.GoverningMemberRow[]>("/admin/governing"),
   saveMember: (input: Record<string, unknown>) => api.post<T.GoverningMemberRow>("/admin/governing", input),

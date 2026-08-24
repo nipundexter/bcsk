@@ -351,6 +351,14 @@ export type EventNews = {
 export type GalleryItem = { id: number; albumId: number; type: string; url: string; caption: string | null };
 export type GalleryAlbum = { id: number; title: string; category: string | null; coverUrl: string | null; items: GalleryItem[] };
 
+export type HeroImage = {
+  id: number;
+  url: string;
+  caption: string | null;
+  displayOrder: number;
+  active: boolean;
+};
+
 export type StudentCornerPost = {
   id: number;
   title: string;

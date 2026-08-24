@@ -80,6 +80,7 @@ export const ADMIN_NAV: { href: string; label: string; permission: Permission | 
   { href: "/admin/cms", label: "CMS Pages", permission: "content:manage" },
   { href: "/admin/news", label: "News & Events", permission: "content:manage" },
   { href: "/admin/gallery", label: "Media Gallery", permission: "content:manage" },
+  { href: "/admin/hero-slider", label: "Homepage Slider", permission: "content:manage" },
   { href: "/admin/student-corner", label: "Student Corner", permission: "content:manage" },
   { href: "/admin/governing", label: "Governing Body", permission: "content:manage" },
   { href: "/admin/courses", label: "Courses & Levels", permission: "courses:manage" },

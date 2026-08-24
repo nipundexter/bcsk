@@ -13,8 +13,11 @@ The complete web platform for **Bangladesh Community School, Korea** — public 
 
 ## Getting started
 
-`backend/` and `frontend/` are two independent npm projects. There is no root manifest, so each
-installs and runs on its own — the full stack needs two terminals.
+`backend/` and `frontend/` are two independent npm projects, each with its own manifest and
+lockfile — every real dependency lives in one of them. The root `package.json` holds none of its
+own; it only proxies `npm run <script>` into each via `--prefix`, so `npm run install:all` and
+`npm run dev` (both projects together, via `concurrently`) work from the repo root without a
+`cd`. Env files still need setting up per project first:
 
 ```bash
 # backend — API on :4000
@@ -23,16 +26,23 @@ npm install
 cp .env.example .env         # DATABASE_URL (pooled), DIRECT_URL (unpooled), JWT_SECRET, …
 npx prisma migrate deploy    # creates the schema
 npm run db:seed              # loads real bcskr.org content + demo accounts
-npm run start:dev
 ```
 
 ```bash
-# frontend — web on :3000, in a second terminal
+# frontend — web on :3000
 cd frontend
 npm install
 cp .env.example .env         # BACKEND_API_URL and NEXT_PUBLIC_* only — no secrets
-npm run dev                  # http://localhost:3000
 ```
+
+Then, from the repo root:
+
+```bash
+npm run dev                  # api :4000 and web :3000 together — http://localhost:3000
+```
+
+Or run each on its own, in two terminals: `npm --prefix backend run start:dev` and
+`npm --prefix frontend run dev`.
 
 > **One `.env` per project, and neither has a `.env.local`.** Do not run `vercel env pull` — it
 > recreates `.env.local` and `.env.production.local`, which Next loads *above* `.env` and which

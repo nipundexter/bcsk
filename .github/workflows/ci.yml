@@ -28,13 +28,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          # No root lockfile any more, so the cache key must name both projects'
-          # lockfiles explicitly or setup-node fails looking for one at the root.
+          # CI never installs the root manifest (it only proxies npm scripts locally, via
+          # concurrently/cross-env for `npm run dev` — neither is used here), so the cache
+          # key names just the two lockfiles CI actually restores from.
           cache-dependency-path: |
             backend/package-lock.json
             frontend/package-lock.json
 
-      # Two independent projects, no root manifest — each installs and runs on its own.
+      # Two independent projects — each installs and runs on its own; CI never runs the
+      # root's proxy scripts.
       - name: Install backend
         working-directory: backend
         run: npm ci

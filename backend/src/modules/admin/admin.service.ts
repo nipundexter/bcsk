@@ -153,6 +153,46 @@ export class AdminService {
     return { ok: true };
   }
 
+  /* ----------------------------- hero slider -------------------------------- */
+
+  static readonly HERO_IMAGE_LIMIT = 5;
+
+  listHeroImages() {
+    return this.prisma.heroImage.findMany({ orderBy: [{ displayOrder: "asc" }, { id: "asc" }] });
+  }
+
+  /** Active images only, in display order — what the public homepage actually renders. */
+  publicHeroImages() {
+    return this.prisma.heroImage.findMany({
+      where: { active: true },
+      orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+    });
+  }
+
+  async addHeroImage(url: string, caption: string | null, actor: Actor) {
+    // Capped server-side, not just in the admin UI — a direct POST past a hidden/removed
+    // button would otherwise let the slider grow without bound.
+    const [count, last] = await Promise.all([
+      this.prisma.heroImage.count(),
+      this.prisma.heroImage.findFirst({ orderBy: { displayOrder: "desc" } }),
+    ]);
+    if (count >= AdminService.HERO_IMAGE_LIMIT) {
+      throw conflict(`The homepage slider holds at most ${AdminService.HERO_IMAGE_LIMIT} images — remove one first.`);
+    }
+    // max(displayOrder) + 1, not count — a delete-then-add sequence would otherwise hand out
+    // a displayOrder that an existing row already has.
+    const displayOrder = (last?.displayOrder ?? -1) + 1;
+    const image = await this.prisma.heroImage.create({ data: { url, caption, displayOrder } });
+    await this.audit.record(actor.userId, "HERO_IMAGE_UPLOAD", "HeroImage", image.id);
+    return image;
+  }
+
+  async deleteHeroImage(id: number, actor: Actor) {
+    await this.prisma.heroImage.delete({ where: { id } });
+    await this.audit.record(actor.userId, "HERO_IMAGE_DELETE", "HeroImage", id);
+    return { ok: true };
+  }
+
   /* ---------------------------- governing body ----------------------------- */
 
   listMembers() {

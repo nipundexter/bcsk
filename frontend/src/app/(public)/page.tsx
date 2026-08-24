@@ -3,6 +3,7 @@ import { getDict } from "@/lib/i18n";
 import { cms, site, getSettings } from "@/services";
 import { formatDate, isoAttr } from "@/lib/dates";
 import { CLASS_LEVELS } from "@/lib/constants";
+import { HeroLanguageSlider } from "@/components/site/HeroLanguageSlider";
 
 export default async function HomePage() {
   const { lang, t } = await getDict();
@@ -20,6 +21,7 @@ export default async function HomePage() {
     chairmanMsg,
     principalMsg,
     campusStatus,
+    heroImages,
   ] = await Promise.all([
     cms.page("home-hero", lang).catch(() => null),
     cms.page("about-us", lang).catch(() => null),
@@ -33,6 +35,7 @@ export default async function HomePage() {
     cms.page("message-chairman", lang).catch(() => null),
     cms.page("message-principal", lang).catch(() => null),
     site.campusStatus().catch(() => null),
+    site.heroImages().catch(() => []),
   ]);
   const specialCourses = allCourses.slice(0, 6);
   const teachers = allTeachers.slice(0, 4);
@@ -92,46 +95,8 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* signature visual: one child, three language worlds */}
-            <div className="relative h-72 sm:h-80 lg:h-[380px] select-none" aria-hidden>
-              {/* Bangla bubble */}
-              <div className="bubble-float absolute left-[6%] top-[8%]">
-                <div className="relative bg-teal text-white rounded-[2rem] rounded-bl-md w-28 h-24 sm:w-32 sm:h-28 flex items-center justify-center shadow-md">
-                  <span lang="bn" className="text-4xl sm:text-5xl font-bold">অ আ</span>
-                  <div className="absolute -bottom-3 left-5 w-0 h-0 border-l-[14px] border-l-transparent border-t-[16px] border-t-teal" />
-                </div>
-              </div>
-              {/* English bubble */}
-              <div className="bubble-float-slow absolute left-[38%] top-[2%]">
-                <div className="relative bg-sunrise text-white rounded-[2.4rem] rounded-br-md w-32 h-28 sm:w-40 sm:h-32 flex items-center justify-center shadow-md">
-                  <span className="text-4xl sm:text-5xl font-display font-bold">ABC</span>
-                  <div className="absolute -bottom-3 right-6 w-0 h-0 border-r-[14px] border-r-transparent border-t-[16px] border-t-sunrise" />
-                </div>
-              </div>
-              {/* Korean bubble */}
-              <div className="bubble-float-slower absolute right-[4%] top-[26%]">
-                <div className="relative bg-sky text-white rounded-[2rem] rounded-bl-md w-28 h-24 sm:w-32 sm:h-26 flex items-center justify-center shadow-md">
-                  <span lang="ko" className="text-4xl sm:text-[2.6rem] font-bold">한글</span>
-                  <div className="absolute -bottom-3 left-6 w-0 h-0 border-l-[14px] border-l-transparent border-t-[16px] border-t-sky" />
-                </div>
-              </div>
-              {/* the child beneath the bubbles: open book */}
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-2 sm:bottom-4">
-                <svg width="220" height="130" viewBox="0 0 220 130" fill="none" aria-hidden>
-                  {/* ground shadow */}
-                  <ellipse cx="110" cy="122" rx="85" ry="8" fill="#F6ECD6" />
-                  {/* open book */}
-                  <path d="M110 45c-14-12-38-16-60-10v62c22-6 46-2 60 10 14-12 38-16 60-10V35c-22-6-46-2-60 10Z" fill="#fff" stroke="#1D2B64" strokeWidth="4" strokeLinejoin="round" />
-                  <path d="M110 45v62" stroke="#1D2B64" strokeWidth="4" />
-                  <path d="M62 52c14-3 28-1 38 5M62 66c14-3 28-1 38 5M62 80c14-3 28-1 38 5M158 52c-14-3-28-1-38 5M158 66c-14-3-28-1-38 5M158 80c-14-3-28-1-38 5" stroke="#38A8DC" strokeWidth="3.5" strokeLinecap="round" />
-                  {/* stars rising from the book */}
-                  <path d="m40 30 2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5 2.5-6Z" fill="#F5820B" />
-                  <path d="m184 22 2 4.8 4.8 2-4.8 2-2 4.8-2-4.8-4.8-2 4.8-2 2-4.8Z" fill="#0FB5A6" />
-                  <circle cx="170" cy="52" r="4" fill="#38A8DC" />
-                  <circle cx="52" cy="14" r="3" fill="#1D2B64" />
-                </svg>
-              </div>
-            </div>
+            {/* signature visual: one child, three language worlds — auto-rotating */}
+            <HeroLanguageSlider images={heroImages} />
           </div>
         </div>
       </section>

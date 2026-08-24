@@ -16,6 +16,10 @@ import { NextRequest, NextResponse } from "next/server";
 const TOSS = "https://js.tosspayments.com";
 const TOSS_API = "https://api.tosspayments.com";
 const RECAPTCHA = "https://www.google.com https://www.gstatic.com";
+// PERF-4: /api/files/... redirects here for any upload stored in Cloudinary rather than
+// streaming bytes itself (FileService.resolve). The delivery host is always res.cloudinary.com
+// regardless of which cloud account backend/.env configures.
+const CLOUDINARY_IMG = "https://res.cloudinary.com";
 
 function contentSecurityPolicy(nonce: string, isDev: boolean): string {
   // Next injects inline bootstrap scripts; it picks up this nonce automatically because the
@@ -39,8 +43,10 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     // next/font self-hosts Google Fonts at build time, so no external font origin is needed.
     "font-src 'self' data:",
-    // Uploads are served from /api/files on our own origin; QR codes are data URIs.
-    "img-src 'self' data: blob:",
+    // Uploads are requested from /api/files on our own origin, but a Cloudinary-stored file
+    // is a 302 there — the browser's img-src check applies to that redirect target too, not
+    // just the initial same-origin URL. QR codes are data URIs.
+    `img-src 'self' data: blob: ${CLOUDINARY_IMG}`,
     `connect-src 'self' ${TOSS_API} ${RECAPTCHA}`,
     // Toss opens a payment window and reCAPTCHA renders in an iframe.
     `frame-src 'self' ${TOSS} ${RECAPTCHA}`,

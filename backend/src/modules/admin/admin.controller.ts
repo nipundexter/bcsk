@@ -87,6 +87,22 @@ export class AdminController {
     return this.admin.deleteAlbum(idParam.parse(raw), a);
   }
 
+  /* ----------------------------- hero slider -------------------------------- */
+
+  @RequirePermission("content:manage") @Get("hero-images")
+  listHeroImages() { return this.admin.listHeroImages(); }
+
+  @RequirePermission("content:manage") @Post("hero-images")
+  addHeroImage(@Body() body: unknown, @CurrentActor() a: Actor) {
+    const { url, caption } = z.object({ url: z.string(), caption: z.string().nullish() }).parse(body);
+    return this.admin.addHeroImage(url, caption ?? null, a);
+  }
+
+  @RequirePermission("content:manage") @Delete("hero-images/:id")
+  deleteHeroImage(@Param("id") raw: string, @CurrentActor() a: Actor) {
+    return this.admin.deleteHeroImage(idParam.parse(raw), a);
+  }
+
   /* ---------------------------- governing body ----------------------------- */
 
   @RequirePermission("content:manage") @Get("governing")

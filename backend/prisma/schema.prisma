@@ -377,6 +377,21 @@ model EventNews {
   @@index([published, date])
 }
 
+/**
+ * The homepage hero slider. A flat, small (admin-capped at 5) list rather than a gallery
+ * album — one purpose, one place, no nesting.
+ */
+model HeroImage {
+  id           Int      @id @default(autoincrement())
+  url          String
+  caption      String?
+  displayOrder Int      @default(100)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([active, displayOrder])
+}
+
 model GalleryAlbum {
   id       Int    @id @default(autoincrement())
   title    String

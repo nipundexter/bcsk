@@ -43,6 +43,9 @@ export class PublicController {
   @Public() @Get("campus-status")
   campusStatus() { return this.admin.campusStatus(); }
 
+  @Public() @Get("hero-images")
+  heroImages() { return this.admin.publicHeroImages(); }
+
   @Public() @Get("curriculum")
   curriculum() { return this.admin.curriculum(); }
 
