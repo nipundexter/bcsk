@@ -11,9 +11,13 @@ code/
   docs/       shared documentation
 ```
 
-Each project carries its own `package.json` and lockfile and installs independently. There is
-no root manifest and no workspace linking them — treat them as two repositories that happen to
-share a directory.
+Each project carries its own `package.json` and lockfile and installs and ships independently —
+treat them as two repositories that happen to share a directory. The root `package.json` is
+**not** a workspace and holds no real dependency of the app: it exists only so tools that expect
+a manifest at the repo root (this workspace's preview launcher, some IDEs) find one, and to offer
+`npm run <script>` conveniences that proxy into `backend/`/`frontend/` via `--prefix`. Its own
+`concurrently` + `cross-env` devDependencies exist solely to run `npm run dev`; nothing about the
+app depends on them.
 
 > **The frontend/backend split is complete.** All four surfaces read the backend through the
 > typed SDK in `frontend/src/services/`; the web app has no database client, no `JWT_SECRET` and
@@ -76,17 +80,34 @@ tier before Phase D narrowed them.
 
 ## Commands
 
-**There is no root `package.json`.** `backend/` and `frontend/` are two independent npm
-projects, each with its own manifest and lockfile; every command runs against one of them.
-Nothing orchestrates both, so running the full stack means two terminals.
+`backend/` and `frontend/` are two independent npm projects, each with its own manifest and
+lockfile — every real dependency lives in one of them, never at the root. The root
+`package.json` only proxies into each via `--prefix`, for convenience and for tools (this
+workspace's preview launcher, some IDEs) that expect a manifest at the repo root:
 
-**`npm --prefix <dir> run <script>` works, but `npm --prefix <dir> install` does not** — with no
-root manifest it reads `package.json` from the *current* directory and exits ENOENT. Installing
-means `cd` into the project.
+```bash
+npm run install:all      # both projects
+npm run dev              # concurrently: api :4000 and web :3000 together
+npm run build             # both
+npm run typecheck        # both
+npm run test              # both
+npm run db:migrate       # backend
+npm run db:seed          # backend
+```
+
+**`npm --prefix <dir> run <script>` works, but `npm --prefix <dir> install` does not** — npm
+resolves `install` against the *current* directory regardless of `--prefix` and exits ENOENT.
+`npm run install:all` (above) handles both; installing one project alone still means `cd`-ing
+into it:
+
+```bash
+cd backend && npm install    # or: cd frontend && npm install
+```
+
+Per-project scripts, for working on just one side:
 
 ```bash
 # backend — NestJS API on :4000
-cd backend && npm install
 npm --prefix backend run start:dev     # watch mode
 npm --prefix backend run build
 npm --prefix backend run typecheck
@@ -97,7 +118,6 @@ npm --prefix backend run db:seed
 
 ```bash
 # frontend — Next.js web on :3000
-cd frontend && npm install
 npm --prefix frontend run dev
 npm --prefix frontend run build
 npm --prefix frontend run typecheck
@@ -105,7 +125,15 @@ npm --prefix frontend run test
 npm --prefix frontend run test:e2e     # playwright, needs both services running
 ```
 
-`npm --prefix backend run lint` still fails outright — the backend has no `eslint.config.js`.
+`npm --prefix backend run lint` still fails outright — the backend has no `eslint.config.js`,
+so `npm run lint` at the root only lints the frontend.
+
+**`npm run dev`'s backend leg pins `PORT=4000` via `cross-env`, deliberately.** A dev-server
+launcher that injects one `PORT` for the whole process tree (this workspace's preview tool does)
+would otherwise hand that same value to both `concurrently` children — the frontend needs it,
+the backend must not get it. `backend/src/main.ts` reads `PORT` from the environment ahead of
+`.env` on purpose (SEC-1-adjacent; see `backend/test/regressions.test.ts`), so the fix belongs in
+the script that launches it, not in weakening that precedence.
 
 Backend API docs at `http://localhost:4000/api/v1/docs` (Swagger, generated from the running app).
 
